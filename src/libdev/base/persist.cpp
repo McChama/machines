@@ -14,6 +14,8 @@
 
 #include "ctl/map.hpp"
 
+#include <cstdint>
+
 // static
 Persistence& Persistence::instance()
 {

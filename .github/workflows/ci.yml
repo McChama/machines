@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux (native + MinGW cross)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Build dev image
+        run: docker build -t machines-cpp-dev -f docker/Dockerfile .
+
+      # Required/blocking: this is the one build path known to be fully green.
+      - name: Native Linux build
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
+            bash -c "mkdir -p build-native && cd build-native && cmake .. && make -j\$(nproc)"
+
+      # Non-blocking: pre-existing memchk.cpp pointer-truncation bug on 64-bit Windows,
+      # unrelated to Phase 0, tracked separately.
+      - name: MinGW64 cross build
+        continue-on-error: true
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
+            bash -c "mkdir -p build-mingw64 && cd build-mingw64 && cmake -DCMAKE_TOOLCHAIN_FILE=/opt/dev/cmake/Toolchain-mingw64.cmake /opt/dev && make -j\$(nproc)"
+
+      # Non-blocking: prebuilt windows/lib32/libALURE32-static.a is ABI-incompatible with the
+      # current mingw-w64 toolchain (exception-handling model mismatch), tracked separately.
+      - name: MinGW32 cross build
+        continue-on-error: true
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
+            bash -c "mkdir -p build-mingw32 && cd build-mingw32 && cmake -DCMAKE_TOOLCHAIN_FILE=/opt/dev/cmake/Toolchain-mingw32.cmake -DBUILD_32=1 /opt/dev && make -j\$(nproc)"
+
+  windows-msvc:
+    name: Windows (native MSVC)
+    runs-on: windows-latest
+    # Native MSVC portability is Phase 2 work; this leg is scaffolding until then.
+    # Known to fail today: Alure has no vcpkg port (see vcpkg.json), so find_package(Alure)
+    # will not resolve until a FetchContent-based fallback is added for this leg.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build --config Release
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    # Native macOS portability is Phase 2 work; this leg is scaffolding until then.
+    # Known to fail today: Homebrew has no alure formula either (same gap as vcpkg).
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Install dependencies
+        run: brew install sdl2-compat sdl2_image glew glm freetype enet openal-soft
+
+      - name: Configure
+        run: cmake -B build -S . -DCMAKE_PREFIX_PATH="$(brew --prefix)"
+
+      - name: Build
+        run: cmake --build build -- -j"$(sysctl -n hw.ncpu)"
