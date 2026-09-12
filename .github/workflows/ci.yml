@@ -31,10 +31,9 @@ jobs:
           docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
             bash -c "cd build-native && ctest --output-on-failure"
 
-      # Non-blocking: pre-existing memchk.cpp pointer-truncation bug on 64-bit Windows,
-      # unrelated to Phase 0, tracked separately.
+      # Required/blocking: fixed the memchk.cpp pointer-truncation bug that used to
+      # block this build (see the fix-memchk-mingw64 branch) - now reliably green.
       - name: MinGW64 cross build
-        continue-on-error: true
         run: |
           docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
             bash -c "mkdir -p build-mingw64 && cd build-mingw64 && cmake -DCMAKE_TOOLCHAIN_FILE=/opt/dev/cmake/Toolchain-mingw64.cmake /opt/dev && make -j\$(nproc)"

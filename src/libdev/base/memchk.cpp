@@ -558,12 +558,15 @@ static  void    logNewBlock( const DebugInfo *dPtr )
             ProProfiler::instance().traceStack( logStream(), true, 0, NULL );
         }
 
-        //Set up string detailing the extra information we want
-        char buffer[64];
+        //Set up string detailing the extra information we want. Sized for the
+        //worst case (a 64-bit %p can print ~20 chars, longer than the fixed
+        //10 chars the old %#08x/(ulong) cast always produced) and written
+        //via snprintf rather than sprintf so a long ctorText can't overflow it.
+        char buffer[128];
         if( ctorText != NULL )
-            sprintf( buffer, "NEW %d %#08x @ %.32s @", dPtr->nBytes, (ulong)address, ctorText );
+            snprintf( buffer, sizeof(buffer), "NEW %d %p @ %.32s @", dPtr->nBytes, address, ctorText );
         else
-            sprintf( buffer, "NEW %d %#08x", dPtr->nBytes, (ulong)address );
+            snprintf( buffer, sizeof(buffer), "NEW %d %p", dPtr->nBytes, address );
 
         ProProfiler::instance().traceStack( logStream(), false, dPtr->lnumber, buffer );
     }
@@ -592,9 +595,9 @@ static  void    logDeleteBlock( const DebugInfo *dPtr )
     void* address = (void *)( (uint8 *)dPtr + sizeof( DebugInfo ) );
     if( recordStackData )
     {
-        //Set up string detailing the extra information we want
-        char buffer[64];
-        sprintf( buffer, "DELETE %#08x", (ulong)address );
+        //Set up string detailing the extra information we want.
+        char buffer[128];
+        snprintf( buffer, sizeof(buffer), "DELETE %p", address );
         ProProfiler::instance().traceStack( logStream(), false, dPtr->lnumber, buffer );
     }
 
