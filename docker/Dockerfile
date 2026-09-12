@@ -1,15 +1,15 @@
-FROM ubuntu:18.04
+FROM ubuntu:24.04
 
 USER root
 
-# Passwordless sudo
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
 RUN apt-get update --fix-missing && \
     apt-get install -y \
+        sudo \
         build-essential \
         file \
         apt-utils \
+        git \
+        git-lfs \
         cmake \
         cmake-curses-gui \
         mingw-w64 \
@@ -18,12 +18,15 @@ RUN apt-get update --fix-missing && \
         libopenal-dev \
         libalure-dev \
         libenet-dev \
-        libfreetype6-dev \
+        libfreetype-dev \
         libglew-dev \
         libglm-dev \
         libaudio-dev
 
+# Passwordless sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN useradd -ms /bin/bash dev
+
+RUN useradd -ms /bin/bash -G sudo dev
 USER dev
 WORKDIR /home/dev

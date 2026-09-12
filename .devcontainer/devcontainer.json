@@ -1,0 +1,19 @@
+{
+  "name": "Machines: Wired For War",
+  "build": {
+    "dockerfile": "../docker/Dockerfile",
+    "context": ".."
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/opt/dev,type=bind",
+  "workspaceFolder": "/opt/dev",
+  "remoteUser": "dev",
+  "postCreateCommand": "git config --global --add safe.directory /opt/dev && git lfs pull",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  }
+}

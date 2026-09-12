@@ -237,6 +237,7 @@ set(SYSTEM_INCLUDES
     ${SDL2_INCLUDE_DIR}
     ${SDL2_IMAGE_INCLUDE_DIR}
     ${GLEW_INCLUDE_PATH}
+    ${GLM_INCLUDE_DIR}
     ${LIBSNDFILE_INCLUDE_DIR}
     ${ALURE_INCLUDE_DIR}
     ${ENET_INCLUDE_DIRS}
@@ -336,5 +337,9 @@ target_link_libraries(planeted libs libaudio ${LIBS} )
 
 target_link_libraries (machines -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
 target_link_libraries (planeted -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 

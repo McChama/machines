@@ -3,7 +3,7 @@
 # Contains global options and definitions
 ##
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.20)
 
 project(machines C CXX)
 include(CheckCXXCompilerFlag)
@@ -152,6 +152,13 @@ set(MACHINES_CXX_FLAGS_DEBUG "${DEBUG_CXX_FLAGS}")
 # Asserts can be enabled/disabled regardless of build type
 option(DEV_BUILD "Enable assert()s and other debug checks" ON)
 
+# Minimal automated tests (see src/tests/). Fetches Catch2 via FetchContent when on,
+# so -DBUILD_TESTING=OFF is available for offline builds.
+option(BUILD_TESTING "Build unit tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+endif()
+
 # Warn about development build
 if(DEV_BUILD)
     message(STATUS "Building with development extensions")
@@ -176,6 +183,7 @@ find_package(OpenGL 2.1 REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(GLEW REQUIRED)
+find_package(GLM REQUIRED)
 find_package(OpenAL REQUIRED)
 find_package(Alure REQUIRED)
 find_package(ENet REQUIRED)
