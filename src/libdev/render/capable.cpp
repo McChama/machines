@@ -92,6 +92,18 @@ bool RenCapabilities::supportsGammaCorrection() const
 	return pImpl_->supportsGammaCorrection();
 }
 
+bool RenCapabilities::supportsAnisotropicFiltering() const
+{
+	PRE(pImpl_);
+	return pImpl_->supportsAnisotropicFiltering();
+}
+
+float RenCapabilities::maxAnisotropy() const
+{
+	PRE(pImpl_);
+	return pImpl_->maxAnisotropy();
+}
+
 const RenICapabilities* RenCapabilities::internal() const
 {
 	return pImpl_;

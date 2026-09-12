@@ -20,10 +20,21 @@ class RenIVertexIntensities;
 class RenIVertexMaterials;
 template <class T> class ctl_vector;
 
-// NB: this is written to have the exact same layout as a D3DLVERTEX.  The
-// normalIndex member occupies the same space as the vertex colour in the
-// D3D struct.  This allows us to memcpy from RenIVertexData to a D3DLVERTEX
-// array.  It *could* break under future versions of DirectX.
+// NB: originally written to have the exact same layout as a D3DLVERTEX (the
+// normalIndex member occupied the same space as the vertex colour in the D3D
+// struct, to allow memcpy'ing to a D3DLVERTEX array) - there is no live D3D
+// backend in this SDL2/OpenGL port any more, so that exact-layout constraint
+// no longer applies. nx/ny/nz are a real per-vertex normal (Phase 1.5:
+// resolved once at mesh-build time from the normalIndex/Normals table below,
+// for GPU-side Blinn-Phong lighting - see StandardShading.vxgls/.fggls),
+// default-initialised to zero so vertices built outside addVertex()/
+// addVertices() (UI/font/points/etc., which never set a normal) keep the
+// legacy unlit vertexColor behaviour.
+//
+// NB: RenIVertex is persisted as raw bytes (see operator<<(PerOstream&,...)
+// in vtxdata.cpp) - adding these fields changes sizeof(RenIVertex) and so
+// breaks binary compatibility with any previously-persisted mesh data. No
+// such data ships in this repository.
 struct RenIVertex
 {
 	float x, y, z;
@@ -44,6 +55,7 @@ struct RenIVertex
 	uint specular;
 	//D3DVALUE tu, tv;
 	float tu, tv;
+	float nx = 0.0f, ny = 0.0f, nz = 0.0f;
 };
 
 ostream& operator<<(ostream&, const RenIVertex&);

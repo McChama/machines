@@ -197,6 +197,9 @@ void RenIVertexData::addVertex(const MexPoint3d& pt, const MexVec3& normal, cons
 	newVtx.z = pt.z();
 	newVtx.tu = uv.x();
 	newVtx.tv = uv.y();
+	newVtx.nx = normal.x();
+	newVtx.ny = normal.y();
+	newVtx.nz = normal.z();
 
 	// Ensure that all the specular values are initialised to black.
 	// This allows the unlit vertices to be memcpy'd to the lit
@@ -231,6 +234,9 @@ void RenIVertexData::addVertices
 	RenIVertex newVtx;
 	newVtx.specular = black;
 	newVtx.normalIndex = addOrFindNormal(normal, normals_);
+	newVtx.nx = normal.x();
+	newVtx.ny = normal.y();
+	newVtx.nz = normal.z();
 
 	ctl_vector<MexPoint3d>::const_iterator ptIt = pts.begin();
 	ctl_vector<MexPoint2d>::const_iterator uvIt = uvs.begin();

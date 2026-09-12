@@ -9,6 +9,7 @@
 #include "render/texture.hpp"
 #include "render/surfmgr.hpp"
 #include "render/device.hpp"
+#include "render/capable.hpp"
 #include "render/display.hpp"
 #include "render/internal/displayi.hpp"
 #include "render/internal/surfbody.hpp"
@@ -678,11 +679,15 @@ bool RenISurfBody::copyWithAlpha
     glBindTexture(GL_TEXTURE_2D, textureID_);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, surfaceDst->w, surfaceDst->h,
                     GL_RGBA, GL_UNSIGNED_BYTE, surfaceDst->pixels);
-    if (createMipmaps && surfaceDst->w > 128 && surfaceDst->h > 128) 
+    if (createMipmaps && surfaceDst->w > 128 && surfaceDst->h > 128)
     {
-        glGenerateMipmap(GL_TEXTURE_2D); 
+        glGenerateMipmap(GL_TEXTURE_2D);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+        const RenCapabilities& caps = RenDevice::current()->capabilities();
+        if (caps.supportsAnisotropicFiltering())
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, caps.maxAnisotropy());
     }
 
     width_ = surface->w; height_ = surface->h;
@@ -714,9 +719,13 @@ bool RenISurfBody::copyWithColourKeyEmulation
                     GL_RGBA, GL_UNSIGNED_BYTE, surfaceDst->pixels);
     if (createMipmaps && surfaceDst->w > 128 && surfaceDst->h > 128)
     {
-        glGenerateMipmap(GL_TEXTURE_2D); 
+        glGenerateMipmap(GL_TEXTURE_2D);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+        const RenCapabilities& caps = RenDevice::current()->capabilities();
+        if (caps.supportsAnisotropicFiltering())
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, caps.maxAnisotropy());
     }
 
     width_ = surface->w; height_ = surface->h;

@@ -8,6 +8,7 @@
 #include "render/internal/ren_pch.hpp"	// NB: pre-compiled header must come 1st
 #include "render/device.hpp"
 
+#include <cstddef>
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
@@ -21,6 +22,7 @@
 #include "mathex/quad3d.hpp"
 #include "mathex/coordsys.hpp"
 #include "mathex/random.hpp"
+#include "mathex/vec3.hpp"
 
 #include "render/colour.hpp"
 #include "render/camera.hpp"
@@ -147,6 +149,13 @@ RenDevice::RenDevice(RenDisplay* display)
 
 	fogColour(RenColour::white());
 
+	// Sane defaults for StandardShading's Blinn-Phong lighting, used until a
+	// caller (typically wherever a scene's main/sun light is set up) calls
+	// mainLightDirection()/mainLightColour()/specularColour() with real values.
+	mainLightDirection(MexVec3(0, -1, 0));
+	mainLightColour(RenColour::white());
+	specularColour(RenColour(0.3f));
+
 	if( not fitToDisplay(display_) )
 	{
 		// TBD: What shall i do then ?
@@ -180,7 +189,11 @@ RenDevice::RenDevice(RenDisplay* display)
 	glVertexPosition_modelspaceID_ = glGetAttribLocation(glProgramID_Standard_, "vertexPosition_modelspace");
 	glVertexColour_modelspaceID_ = glGetAttribLocation(glProgramID_Standard_, "vertexColor");
     glVertex_modelspaceUVID_ = glGetAttribLocation(glProgramID_Standard_, "vertexUV");
+    glVertexNormal_modelspaceID_ = glGetAttribLocation(glProgramID_Standard_, "vertexNormal");
     glTextureSamplerID_ = glGetUniformLocation( glProgramID_Standard_, "uTextureSampler2" );
+    glLightDirectionID_ = glGetUniformLocation(glProgramID_Standard_, "uLightDirection");
+    glLightColourID_ = glGetUniformLocation(glProgramID_Standard_, "uLightColour");
+    glSpecularColourID_ = glGetUniformLocation(glProgramID_Standard_, "uSpecularColour");
 
     glProgramID_Billboard_ = loadShaders( "BillboardShading.vxgls", "2DShading.fggls" );
 	// VBO
@@ -501,6 +514,16 @@ bool RenDevice::fitToDisplay(RenDisplay* display)
 	{
 		SysWindowsAPI::messageBox("Your graphic card or driver does not support OpenGL 2.1!\nToo bad, will terminate now.", "Error");
 		return EXIT_FAILURE;
+	}
+
+	// GLEW is only valid to query from here on - this is why anisotropic
+	// filtering support can't be detected inside RenICapabilities's constructor
+	// (that runs before glewInit(), see caps_ construction above).
+	if (glewIsSupported("GL_EXT_texture_filter_anisotropic"))
+	{
+		GLfloat maxAniso = 1.0f;
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+		caps_->internal()->setSupportsAnisotropicFiltering(true, maxAniso);
 	}
 
     //glEnable(GL_BLEND);
@@ -2013,6 +2036,36 @@ void RenDevice::fogColour(const RenColour& newFogColour)
 	fogColour_ = newFogColour;
 }
 
+void RenDevice::mainLightDirection(const MexVec3& dir)
+{
+	lightDirection_ = glm::vec3(dir.x(), dir.y(), dir.z());
+}
+
+const glm::vec3& RenDevice::mainLightDirection() const
+{
+	return lightDirection_;
+}
+
+void RenDevice::mainLightColour(const RenColour& colour)
+{
+	lightColour_ = glm::vec3(colour.r(), colour.g(), colour.b());
+}
+
+const glm::vec3& RenDevice::mainLightColour() const
+{
+	return lightColour_;
+}
+
+void RenDevice::specularColour(const RenColour& colour)
+{
+	specularColour_ = glm::vec3(colour.r(), colour.g(), colour.b());
+}
+
+const glm::vec3& RenDevice::specularColour() const
+{
+	return specularColour_;
+}
+
 ostream& RenDevice::out()
 {
 	PRE(pImpl_);
@@ -2294,12 +2347,12 @@ void RenDevice::renderPrimitive
 
     glUniform3fv(glFogColourID_, 1, &fogColour_[0]);
     glUniform3fv(glFogParamsID_, 1, &fogParams_[0]);
+    glUniform3fv(glLightDirectionID_, 1, &lightDirection_[0]);
+    glUniform3fv(glLightColourID_, 1, &lightColour_[0]);
+    glUniform3fv(glSpecularColourID_, 1, &specularColour_[0]);
     //std::cout<<glm::to_string(MVP)<<std::endl;
     //glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
     //glUniformMatrix4fv(ViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
-
-    //glm::vec3 lightPos = glm::vec3(4,4,4);
-    //glUniform3f(LightID, lightPos.x, lightPos.y, lightPos.z);
 
     // Bind our texture in Texture Unit 0
     glActiveTexture(GL_TEXTURE0);
@@ -2321,7 +2374,7 @@ void RenDevice::renderPrimitive
         GL_FLOAT,                     // type
         GL_FALSE,                     // normalized?
         sizeof(RenIVertex),           // stride
-        (void*)0                      // array buffer offset
+        (void*)offsetof(RenIVertex, x) // array buffer offset
     );
 
     // 2nd attribute buffer : UVs
@@ -2332,7 +2385,7 @@ void RenDevice::renderPrimitive
         GL_FLOAT,                     // type
         GL_FALSE,                     // normalized?
         sizeof(RenIVertex),           // stride
-        (void*)(sizeof(RenIVertex)-2*sizeof(float))          // array buffer offset
+        (void*)offsetof(RenIVertex, tu) // array buffer offset
     );
 
     // vertex colours
@@ -2343,28 +2396,28 @@ void RenDevice::renderPrimitive
         GL_UNSIGNED_BYTE,             // type
         GL_TRUE,                     // normalized?
         sizeof(RenIVertex),            // stride
-        (void*)(3*sizeof(float)+sizeof(uint)) // array buffer offset
+        (void*)offsetof(RenIVertex, color) // array buffer offset
     );
 
-    /*// 3rd attribute buffer : normals
-    glEnableVertexAttribArray(vertexNormal_modelspaceID);
-    glBindBuffer(GL_ARRAY_BUFFER, normalbuffer);
+    // 3rd attribute buffer : normals (interleaved in the same RenIVertex buffer,
+    // not a separate one - see nx/ny/nz in vtxdata.hpp).
+    glEnableVertexAttribArray(glVertexNormal_modelspaceID_);
     glVertexAttribPointer(
-        vertexNormal_modelspaceID,    // The attribute we want to configure
+        glVertexNormal_modelspaceID_, // The attribute we want to configure
         3,                            // size
         GL_FLOAT,                     // type
         GL_FALSE,                     // normalized?
-        0,                            // stride
-        (void*)0                      // array buffer offset
+        sizeof(RenIVertex),           // stride
+        (void*)offsetof(RenIVertex, nx) // array buffer offset
     );
-*/
+
     // Draw the triangles !
     glDrawArrays(mode, 0, nVertices );
 
     glDisableVertexAttribArray(glVertexPosition_modelspaceID_);
     glDisableVertexAttribArray(glVertex_modelspaceUVID_);
     glDisableVertexAttribArray(glVertexColour_modelspaceID_);
-    //glDisableVertexAttribArray(vertexNormal_modelspaceID);
+    glDisableVertexAttribArray(glVertexNormal_modelspaceID_);
 
 }
 
@@ -2398,11 +2451,9 @@ void RenDevice::renderIndexed
 
     glUniform3fv(glFogColourID_, 1, &fogColour_[0]);
     glUniform3fv(glFogParamsID_, 1, &fogParams_[0]);
-    /*glUniformMatrix4fv(ModelMatrixID, 1, GL_FALSE, &ModelMatrix[0][0]);
-    glUniformMatrix4fv(ViewMatrixID, 1, GL_FALSE, &ViewMatrix[0][0]);
-
-    glm::vec3 lightPos = glm::vec3(4,4,4);
-    glUniform3f(LightID, lightPos.x, lightPos.y, lightPos.z);*/
+    glUniform3fv(glLightDirectionID_, 1, &lightDirection_[0]);
+    glUniform3fv(glLightColourID_, 1, &lightColour_[0]);
+    glUniform3fv(glSpecularColourID_, 1, &specularColour_[0]);
 
     // Bind our texture in Texture Unit 0
     glActiveTexture(GL_TEXTURE0);
@@ -2423,7 +2474,7 @@ void RenDevice::renderIndexed
         GL_FLOAT,                     // type
         GL_FALSE,                     // normalized?
         sizeof(RenIVertex),           // stride
-        (void*)0                      // array buffer offset
+        (void*)offsetof(RenIVertex, x) // array buffer offset
     );
 
     // 2nd attribute buffer : UVs
@@ -2434,7 +2485,7 @@ void RenDevice::renderIndexed
         GL_FLOAT,                     // type
         GL_FALSE,                     // normalized?
         sizeof(RenIVertex),           // stride
-        (void*)(sizeof(RenIVertex)-2*sizeof(float))          // array buffer offset
+        (void*)offsetof(RenIVertex, tu) // array buffer offset
     );
 
     // vertex colours
@@ -2445,20 +2496,19 @@ void RenDevice::renderIndexed
         GL_UNSIGNED_BYTE,             // type
         GL_TRUE,                     // normalized?
         sizeof(RenIVertex),            // stride
-        (void*)(3*sizeof(float)+sizeof(uint)) // array buffer offset
+        (void*)offsetof(RenIVertex, color) // array buffer offset
     );
 
-    // 3rd attribute buffer : normals
-    /*glEnableVertexAttribArray(vertexNormal_modelspaceID);
-    glBindBuffer(GL_ARRAY_BUFFER, normalbuffer);
+    // 3rd attribute buffer : normals (interleaved in the same RenIVertex buffer).
+    glEnableVertexAttribArray(glVertexNormal_modelspaceID_);
     glVertexAttribPointer(
-        vertexNormal_modelspaceID,    // The attribute we want to configure
+        glVertexNormal_modelspaceID_, // The attribute we want to configure
         3,                            // size
         GL_FLOAT,                     // type
         GL_FALSE,                     // normalized?
-        0,                            // stride
-        (void*)0                      // array buffer offset
-    );*/
+        sizeof(RenIVertex),           // stride
+        (void*)offsetof(RenIVertex, nx) // array buffer offset
+    );
 
     // Index buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glElementBufferID_);
@@ -2475,7 +2525,7 @@ void RenDevice::renderIndexed
     glDisableVertexAttribArray(glVertexPosition_modelspaceID_);
     glDisableVertexAttribArray(glVertex_modelspaceUVID_);
     glDisableVertexAttribArray(glVertexColour_modelspaceID_);
-    //glDisableVertexAttribArray(vertexNormal_modelspaceID);
+    glDisableVertexAttribArray(glVertexNormal_modelspaceID_);
 }
 
 void RenDevice::renderIndexedScreenspace

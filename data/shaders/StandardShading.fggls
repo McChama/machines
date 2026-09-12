@@ -7,18 +7,22 @@ in vec4 fragmentColor;
 in vec4 viewSpace;
 in vec4 fragmentFogColour;
 in vec3 fragmentFogParams;
+in vec3 fragmentNormal;
+in vec3 fragmentLightDirection;
 out vec4 outFragColor;
 
 // Values that stay constant for the whole mesh.
 uniform sampler2D uTextureSampler2;
+uniform vec3 uLightColour;
+uniform vec3 uSpecularColour;
 
 void main() {
-    
+
     // Distance used by fog
     float dist = length(viewSpace);
     float fogStart = fragmentFogParams[0];
     float fogEnd = fragmentFogParams[1];
-   
+
    float fogFactor = 0.0f;
    // fogEnd range value greater than zero indicates that fog is turned on
    if(fogEnd > 0.0f)
@@ -26,13 +30,45 @@ void main() {
         fogFactor = (fogStart - dist)/(fogStart - fogEnd);
         fogFactor = clamp( fogFactor, 0.0f, 1.0f );
    }
-    
+
+    // Blinn-Phong for real meshes (a non-zero vertexNormal was supplied at
+    // mesh-build time); vertexColor is used unlit, exactly as before this
+    // change, for everything else (UI, fonts, points, backgrounds, ...) -
+    // see vertexNormal's comment in StandardShading.vxgls.
+    vec3 litColour;
+    if (dot(fragmentNormal, fragmentNormal) > 0.0001f)
+    {
+        vec3 N = normalize(fragmentNormal);
+        // fragmentLightDirection is the direction the light travels (see
+        // uLightDirection in StandardShading.vxgls); negate to get the
+        // surface-to-light vector used for the dot products below.
+        vec3 L = normalize(-fragmentLightDirection);
+        vec3 V = normalize(-viewSpace.xyz);
+        vec3 H = normalize(L + V);
+
+        const float shininess = 32.0f;
+        const float ambientFactor = 0.15f;
+
+        float NdotL = max(dot(N, L), 0.0f);
+        float NdotH = max(dot(N, H), 0.0f);
+
+        vec3 ambient = ambientFactor * uLightColour;
+        vec3 diffuse = uLightColour * NdotL;
+        vec3 specular = uSpecularColour * pow(NdotH, shininess);
+
+        litColour = ambient + diffuse + specular;
+    }
+    else
+    {
+        litColour = fragmentColor.rgb;
+    }
+
 	// Output color = color of the texture at the specified UV
-    outFragColor = texture( uTextureSampler2, UV ) * fragmentColor;
-    
+    outFragColor = texture( uTextureSampler2, UV ) * vec4(litColour, fragmentColor.a);
+
     //Appy fog, if you inverse color in glsl mix function you have to
-    //put 1.0 - fogFactor    
+    //put 1.0 - fogFactor
     float alpha = outFragColor[3];
-    outFragColor = outFragColor * (1.0f - fogFactor) + fragmentFogColour * (fogFactor); 
+    outFragColor = outFragColor * (1.0f - fogFactor) + fragmentFogColour * (fogFactor);
     outFragColor[3] = alpha;
 }

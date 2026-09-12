@@ -54,31 +54,32 @@ RenTextureSetImpl::~RenTextureSetImpl()
 	TEXSET_INDENT(-2);
 }
 
+// Recognised texture file extensions - kept in sync with texbody.cpp's list.
+static const char* const RECOGNISED_TEXTURE_EXTENSIONS[] = { "bmp", "png", "jpg", "tga" };
+
+// Returns true if pathname's filename ends with "_<literal>.<ext>" for any
+// recognised extension (case-insensitive).
+static bool matchesLiteralSuffix(const SysPathName& pathname, const std::string& literal)
+{
+	const std::string& texName = pathname.filename();
+	for (size_t i = 0; i < sizeof(RECOGNISED_TEXTURE_EXTENSIONS) / sizeof(RECOGNISED_TEXTURE_EXTENSIONS[0]); ++i)
+	{
+		const std::string candidate = "_" + literal + "." + RECOGNISED_TEXTURE_EXTENSIONS[i];
+		if (texName.length() >= candidate.length() &&
+			strcasecmp(texName.substr(texName.length() - candidate.length()).c_str(), candidate.c_str()) == 0)
+			return true;
+	}
+	return false;
+}
+
 static bool isAlphaMap( const SysPathName& pathname )
 {
-	bool result=false;
-	const std::string & texName = pathname.filename();
-	const std::string  end = texName.substr(texName.length() - 6, 6);
-	if (strcasecmp( end.c_str(), "_a.bmp" ) == 0)
-		result = true;
-	const std::string  end2 = texName.substr(texName.length() - 7, 7);
-	if( strcasecmp( end2.c_str(), "_ba.bmp" ) == 0 )
-		result = true;
-	return result;
+	return matchesLiteralSuffix(pathname, "a") || matchesLiteralSuffix(pathname, "ba");
 }
 
 bool isColourMap( const SysPathName& pathname )
 {
-	bool result=false;
-	const std::string & texName = pathname.filename();
-	const std::string  end = texName.substr(texName.length() - 6, 6);
-	if (strcasecmp( end.c_str(), "_c.bmp" ) == 0)
-		result = true;
-	const std::string  end2 = texName.substr(texName.length() - 7, 7);
-	if( strcasecmp( end2.c_str(), "_bc.bmp" ) == 0 )
-		result = true;
-
-	return result;
+	return matchesLiteralSuffix(pathname, "c") || matchesLiteralSuffix(pathname, "bc");
 }
 
 void RenTextureSetImpl::load( const SysPathName& directory, BaseProgressReporter* pReporter )
@@ -89,12 +90,21 @@ void RenTextureSetImpl::load( const SysPathName& directory, BaseProgressReporter
 	TEXSET_INDENT(2);
 	TEXSET_STREAM(RenSurfaceManager::instance());
 
-	SysFileEnumerator fileFinder( directory, "*.bmp" );
-	fileFinder.examineSubdirectories( true );
-	fileFinder.find();
-	const ctl_vector< SysFileData >& files = fileFinder.files();
+	// SysFileEnumerator only takes one file spec per instance, so scan once per
+	// recognised extension and combine the results.
+	ctl_vector< SysFileData > files;
+	for (size_t i = 0; i < sizeof(RECOGNISED_TEXTURE_EXTENSIONS) / sizeof(RECOGNISED_TEXTURE_EXTENSIONS[0]); ++i)
+	{
+		const std::string spec = std::string("*.") + RECOGNISED_TEXTURE_EXTENSIONS[i];
+		SysFileEnumerator fileFinder( directory, spec.c_str() );
+		fileFinder.examineSubdirectories( true );
+		fileFinder.find();
+		const ctl_vector< SysFileData >& found = fileFinder.files();
+		for (ctl_vector< SysFileData >::const_iterator it = found.begin(); it != found.end(); ++it)
+			files.push_back( *it );
+	}
 
-	TEXSET_STREAM("Found " << files.size() << " .bmp files" << std::endl);
+	TEXSET_STREAM("Found " << files.size() << " texture files" << std::endl);
 	textures_.reserve( files.size() );
 
 	size_t filesRead = 0;

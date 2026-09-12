@@ -130,45 +130,42 @@ static bool isPowerOf2(int dimension)
 	}
 }
 
+// Recognised texture file extensions. All are exactly 3 letters after the dot,
+// which alphaMapName()/colourMapName() below rely on (fixed-offset letter swap).
+static const char* const RECOGNISED_TEXTURE_EXTENSIONS[] = { "bmp", "png", "jpg", "tga" };
+
+// Returns true if pathname's filename ends with "_<literal>.<ext>" for any
+// recognised extension (case-insensitive).
+static bool matchesLiteralSuffix(const SysPathName& pathname, const std::string& literal)
+{
+	const std::string& texName = pathname.filename();
+	for (size_t i = 0; i < sizeof(RECOGNISED_TEXTURE_EXTENSIONS) / sizeof(RECOGNISED_TEXTURE_EXTENSIONS[0]); ++i)
+	{
+		const std::string candidate = "_" + literal + "." + RECOGNISED_TEXTURE_EXTENSIONS[i];
+		if (texName.length() >= candidate.length() &&
+			strcasecmp(texName.substr(texName.length() - candidate.length()).c_str(), candidate.c_str()) == 0)
+			return true;
+	}
+	return false;
+}
+
 // Implements a naming convention: textures which use colour keyed
 // transparency have names ending in "_t" or "_bt".
 static bool isTransparent(const SysPathName& pathname)
 {
-	const std::string & texName = pathname.filename();
-	const std::string  end = texName.substr(texName.length() - 6, 6);
-	if (strcasecmp( end.c_str(), "_t.bmp" ) == 0)
-		return true;
-
-	const std::string  end2 = texName.substr(texName.length() - 7, 7);
-	return strcasecmp( end2.c_str(), "_bt.bmp" ) == 0;
+	return matchesLiteralSuffix(pathname, "t") || matchesLiteralSuffix(pathname, "bt");
 }
 
 // These two methods are only used for assert checking.
 #ifndef NDEBUG
 static bool isAlpha(const SysPathName& pathname)
 {
-	bool result=false;
-	const std::string& texName = pathname.filename();
-	const std::string  end = texName.substr(texName.length() - 6, 6);
-	if (strcasecmp( end.c_str(), "_a.bmp" ) == 0)
-		result = true;
-	const std::string  end2 = texName.substr(texName.length() - 7, 7);
-	if( strcasecmp( end2.c_str(), "_ba.bmp" ) == 0 )
-		result = true;
-	return result;
+	return matchesLiteralSuffix(pathname, "a") || matchesLiteralSuffix(pathname, "ba");
 }
 
 static bool isColour(const SysPathName& pathname)
 {
-	bool result=false;
-	const std::string & texName = pathname.filename();
-	const std::string  end = texName.substr(texName.length() - 6, 6);
-	if (strcasecmp( end.c_str(), "_c.bmp" ) == 0)
-		result = true;
-	const std::string  end2 = texName.substr(texName.length() - 7, 7);
-	if( strcasecmp( end2.c_str(), "_bc.bmp" ) == 0 )
-		result = true;
-		return result;
+	return matchesLiteralSuffix(pathname, "c") || matchesLiteralSuffix(pathname, "bc");
 }
 #endif
 
@@ -176,13 +173,7 @@ static bool isColour(const SysPathName& pathname)
 // transparency have names ending in "_b" or "_bt".
 static bool bilinearRequired(const SysPathName& pathname)
 {
-	const std::string & texName = pathname.filename();
-	const std::string  end = texName.substr(texName.length() - 6, 6);
-	if (strcasecmp( end.c_str(), "_b.bmp" ) == 0)
-		return true;
-
-	const std::string  end2 = texName.substr(texName.length() - 7, 7);
-	return strcasecmp( end2.c_str(), "_bt.bmp" ) == 0;
+	return matchesLiteralSuffix(pathname, "b") || matchesLiteralSuffix(pathname, "bt");
 }
 
 // Implements a naming convention: alpha maps have the same name as their

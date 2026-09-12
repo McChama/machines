@@ -17,6 +17,7 @@ class SysPathName;
 class MexQuad3d;
 class MexPoint2d;
 class MexPoint3d;
+class MexVec3;
 
 class RenDisplay;
 class RenColour;
@@ -178,6 +179,17 @@ public:
 	float fogEnd() const;
 	float fogDensity() const;
 
+	// The main (single, directional) light used by StandardShading's Blinn-Phong
+	// lighting, e.g. sourced from a scene's W4dDirectionalLight/RenDirectionalLight.
+	// Defaults to a plain downward white light with a modest grey specular so the
+	// shader always has sane values even before any caller sets these.
+	void mainLightDirection(const MexVec3&);
+	const glm::vec3& mainLightDirection() const;
+	void mainLightColour(const RenColour&);
+	const glm::vec3& mainLightColour() const;
+	void specularColour(const RenColour&);
+	const glm::vec3& specularColour() const;
+
 	// The dimensions of the display, window or whatever.
 	int windowWidth () const;
 	int windowHeight() const;
@@ -331,11 +343,14 @@ private:
 	GLuint glFogColourID_, glFogParamsID_;
 
 	GLuint glVertexPosition_modelspaceID_, glVertex_modelspaceUVID_, glVertexColour_modelspaceID_, glVertexDataBufferID_, glElementBufferID_;
+	GLuint glVertexNormal_modelspaceID_;
+	GLuint glLightDirectionID_, glLightColourID_, glSpecularColourID_;
 	GLuint glViewProjMatrix_BillboardID_, glVertexPosition_BillboardID_, glVertex_BillboardUVID_, glVertexColour_BillboardID_, glVertexDataBufferBillboardID_, glElementBufferBillboardID_;
     GLuint glTextureEmptyID_, glOffscreenFrameBuffID_;
 
 	glm::mat4 model_, view_, projection_;
 	glm::vec3 fogColour_, fogParams_;
+	glm::vec3 lightDirection_, lightColour_, specularColour_;
 
     // Operations deliberately revoked
     RenDevice( const RenDevice& );
