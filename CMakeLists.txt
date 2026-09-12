@@ -185,7 +185,56 @@ find_package(SDL2_image REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(GLM REQUIRED)
 find_package(OpenAL REQUIRED)
-find_package(Alure REQUIRED)
+
+# Classic Alure 1.x has no vcpkg port or Homebrew formula, so it isn't findable
+# out of the box on MSVC/macOS (Linux apt and the bundled windows/ MinGW libs
+# already satisfy this REQUIRED find just fine). When the system copy isn't
+# found, fetch and build alure 1.2 from source as a fallback.
+find_package(Alure QUIET)
+if(NOT ALURE_FOUND)
+    message(STATUS "System Alure not found - fetching and building alure 1.2 from source")
+
+    include(FetchContent)
+    set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+    FetchContent_Declare(alure_src
+        URL https://archive.ubuntu.com/ubuntu/pool/universe/a/alure/alure_1.2.orig.tar.bz2
+        URL_HASH SHA256=465e6adae68927be3a023903764662d64404e40c4c152d160e3a8838b1d70f71
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_GetProperties(alure_src)
+    if(NOT alure_src_POPULATED)
+        FetchContent_Populate(alure_src)
+
+        # alure 1.2's CMakeLists.txt and cmake/CheckFileOffsetBits.cmake both
+        # look up alure's own bundled cmake/ helper files via CMAKE_SOURCE_DIR,
+        # which as a FetchContent subproject means *our* top-level source dir,
+        # not alure's own - patch both to CMAKE_CURRENT_SOURCE_DIR.
+        foreach(_alure_file_to_patch "CMakeLists.txt" "cmake/CheckFileOffsetBits.cmake")
+            file(READ "${alure_src_SOURCE_DIR}/${_alure_file_to_patch}" _alure_file_content)
+            string(REPLACE "\${CMAKE_SOURCE_DIR}" "\${CMAKE_CURRENT_SOURCE_DIR}" _alure_file_content "${_alure_file_content}")
+            file(WRITE "${alure_src_SOURCE_DIR}/${_alure_file_to_patch}" "${_alure_file_content}")
+        endforeach()
+
+        # alure 1.2's CMakeLists.txt predates CMake 3.5; CMake 4.x removed
+        # support for policies below 3.5 outright, so raise the floor just
+        # for processing this subdirectory.
+        set(_alure_saved_policy_min "${CMAKE_POLICY_VERSION_MINIMUM}")
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+        add_subdirectory(${alure_src_SOURCE_DIR} ${alure_src_BINARY_DIR})
+        set(CMAKE_POLICY_VERSION_MINIMUM "${_alure_saved_policy_min}")
+    endif()
+
+    # alure-static's own CMakeLists.txt never links OpenAL into the static
+    # target (only its shared counterpart does), so consumers must do so
+    # themselves - src/CMakeLists.txt already links ${OPENAL_LIBRARY}
+    # alongside ${ALURE_LIBRARY} independently, so this matches.
+    set(ALURE_LIBRARY alure-static)
+    set(ALURE_INCLUDE_DIR ${alure_src_SOURCE_DIR}/include)
+    set(ALURE_FOUND TRUE)
+endif()
+
 find_package(ENet REQUIRED)
 find_package(Freetype REQUIRED)
 
