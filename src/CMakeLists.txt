@@ -338,4 +338,8 @@ target_link_libraries(planeted libs libaudio ${LIBS} )
 target_link_libraries (machines -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
 target_link_libraries (planeted -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
 
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+
 

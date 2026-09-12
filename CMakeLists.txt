@@ -152,6 +152,13 @@ set(MACHINES_CXX_FLAGS_DEBUG "${DEBUG_CXX_FLAGS}")
 # Asserts can be enabled/disabled regardless of build type
 option(DEV_BUILD "Enable assert()s and other debug checks" ON)
 
+# Minimal automated tests (see src/tests/). Fetches Catch2 via FetchContent when on,
+# so -DBUILD_TESTING=OFF is available for offline builds.
+option(BUILD_TESTING "Build unit tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+endif()
+
 # Warn about development build
 if(DEV_BUILD)
     message(STATUS "Building with development extensions")

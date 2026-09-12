@@ -19,11 +19,17 @@ jobs:
       - name: Build dev image
         run: docker build -t machines-cpp-dev -f docker/Dockerfile .
 
-      # Required/blocking: this is the one build path known to be fully green.
+      # Required/blocking: this is the one build path known to be fully green. Also builds
+      # machines_tests (src/tests/), since it's part of the default `all` target.
       - name: Native Linux build
         run: |
           docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
             bash -c "mkdir -p build-native && cd build-native && cmake .. && make -j\$(nproc)"
+
+      - name: Run unit tests (ctest)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/opt/dev" -w /opt/dev machines-cpp-dev \
+            bash -c "cd build-native && ctest --output-on-failure"
 
       # Non-blocking: pre-existing memchk.cpp pointer-truncation bug on 64-bit Windows,
       # unrelated to Phase 0, tracked separately.

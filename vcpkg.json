@@ -2,6 +2,7 @@
   "name": "machines",
   "version-string": "0.1.1.5",
   "description": "Machines: Wired For War - dependency manifest for the native MSVC build only. Linux/macOS/MinGW builds continue to use cmake/Find*.cmake and system packages.",
+  "builtin-baseline": "a1cae005c39be7b18ba319fced856b68d7276271",
   "dependencies": [
     "sdl2",
     "sdl2-image",
