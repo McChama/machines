@@ -38,7 +38,9 @@ RenICapabilities::RenICapabilities(const RenDevice* dev, bool h):
 	supportsGammaCorrection_(false),
 	supportsSharedVideoMemory_(false),
 	supportsTextureSysMemory_(false),
-	supports8BitsTexture_(false)
+	supports8BitsTexture_(false),
+	supportsAnisotropicFiltering_(false),
+	maxAnisotropy_(1.0f)
 {
 	PRE(dev);
 
@@ -114,6 +116,22 @@ ulong RenICapabilities::memoryRequiredBy4MBytesTextureSet() const
 void RenICapabilities::setSupportsGammaCorrection()
 {
 
+}
+
+bool RenICapabilities::supportsAnisotropicFiltering() const
+{
+	return supportsAnisotropicFiltering_;
+}
+
+void RenICapabilities::setSupportsAnisotropicFiltering(bool supported, float maxAnisotropy)
+{
+	supportsAnisotropicFiltering_ = supported;
+	maxAnisotropy_ = maxAnisotropy;
+}
+
+float RenICapabilities::maxAnisotropy() const
+{
+	return maxAnisotropy_;
 }
 
 /* End CAPABLE.CPP **************************************************/

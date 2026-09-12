@@ -26,6 +26,7 @@
 class IDirect3DRMMeshBuilder;
 class MexTransform3d;
 class GXMesh;
+class RenIObjMesh;
 namespace XFile { class Scene; class Mesh; };
 
 class RenDevice;
@@ -233,6 +234,7 @@ private:
 	Ren::VertexIdx addOrFindVertex(const MexPoint3d&, double epsilon);
 	bool buildFromXMesh(XFile::Scene*, XFile::Mesh*);
 	bool buildFromGXMesh(GXMesh*);
+	bool buildFromObjMesh(const RenIObjMesh&);
 	void createTextures();
 
     //Called when the data is dirty (because the mesh has been edited)

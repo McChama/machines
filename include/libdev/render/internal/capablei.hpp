@@ -46,6 +46,14 @@ public:
 	bool supportsGammaCorrection() const;
 	void setSupportsGammaCorrection();
 
+	// GL_EXT_texture_filter_anisotropic. Unlike the flags above (all currently
+	// hardcoded true, legacy-D3D-capability-query stubs) this is a real GLEW
+	// query, set post-construction once GLEW is initialised - see
+	// setSupportsAnisotropicFiltering().
+	bool supportsAnisotropicFiltering() const;
+	void setSupportsAnisotropicFiltering(bool supported, float maxAnisotropy);
+	float maxAnisotropy() const;
+
 	// The driver supports anti-aliasing.  More specifically, this returns true
 	// only if the type of anti-aliasing does not impose contraints on the
 	// rendering (some of them require the polygons rendered in order).
@@ -85,6 +93,8 @@ private:
 	bool supportsGammaCorrection_;
 	ulong totalVideoMemory_, totalTextureMemory_;
 	ulong minDisplayMemory_;
+	bool supportsAnisotropicFiltering_;
+	float maxAnisotropy_;
 };
 
 #ifdef _INLINE

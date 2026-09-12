@@ -23,6 +23,7 @@
 #include "render/internal/glmath.hpp"
 #include "render/internal/meshload.hpp"
 #include "render/internal/gxmeshload.hpp"
+#include "render/internal/objmesh.hpp"
 #include "xin/XFileHelper.hpp"
 
 #include "render/internal/meshfact.hpp"
@@ -1189,8 +1190,34 @@ bool RenMesh::read(const SysPathName& pathName, const string& meshName, double s
       return true;
     }
 
-    // file was neither .agt nor .x
-    RENDER_STREAM("RenMesh::read() ; Could not read file " << withExtDX << " or file " << withExtAGT << std::endl);
+    // No .agt file either, try to load an .obj file (Phase 1.5's importer -
+    // see RenIObjMeshLoader). Unlike .agt/.X, a single .obj carries no
+    // internal part/pivot hierarchy - see docs/roadmap-machines-remake-en.md
+    // Phase 1.5 for how multi-part units are meant to be assembled instead.
+    SysPathName withExtOBJ( pathName );
+    withExtOBJ.extension( "obj" );
+    if (withExtOBJ.existsAsFile())
+    {
+      DBG_LOAD0("Loading mesh " << meshName << " from " << pathName << std::endl);
+      RenStreamIndenter indenter;
+
+      RenIObjMesh objMesh;
+      if (!RenIObjMeshLoader::load(withExtOBJ, &objMesh))
+        return false;
+
+      if (!buildFromObjMesh(objMesh))
+        return false;
+
+      DBG_LOAD0("Conversion to the RenMesh format succeeded" << std::endl);
+
+      pathName_ = withExtOBJ.pathname();
+      meshName_ = meshName;
+      isDirty_ = true;
+      return true;
+    }
+
+    // file was neither .agt, .x nor .obj
+    RENDER_STREAM("RenMesh::read() ; Could not read file " << withExtDX << ", file " << withExtAGT << " or file " << withExtOBJ << std::endl);
 	return false;
 
 
@@ -2523,6 +2550,60 @@ bool RenMesh::buildFromGXMesh(GXMesh *gxmesh)
 
   DBG_LOAD0("Conversion succeded" << std::endl);
   return true;
+}
+
+// Simpler counterpart to buildFromGXMesh: RenIObjMesh is already deduplicated
+// and already in this engine's Y-up render-space convention (a Blender OBJ
+// export needs no axis flip, unlike .agt/.X's Z-up data), so this just
+// copies vertices across and builds one RenIDistinctGroup per material group.
+bool RenMesh::buildFromObjMesh(const RenIObjMesh& objMesh)
+{
+    DBG_LOAD0("The OBJ mesh is now being converted to the RenMesh format" << std::endl);
+
+    vertices_ = _NEW(RenIVertexData(objMesh.numVertices()));
+
+    static const MexVec3 almostZeroVec(0, 0, 1.2 * MexEpsilon::instance());
+    for (size_t i = 0; i < objMesh.numVertices(); ++i)
+    {
+        const MexVec3& normal = objMesh.normal(i);
+        // As in buildFromGXMesh: addVertex() rejects a zero normal.
+        if (normal.isZeroVector())
+            vertices_->addVertex(objMesh.position(i), almostZeroVec, objMesh.uv(i));
+        else
+            vertices_->addVertex(objMesh.position(i), normal, objMesh.uv(i));
+    }
+
+    for (size_t g = 0; g < objMesh.numMaterialGroups(); ++g)
+    {
+        const RenIObjMaterialGroup& group = objMesh.materialGroup(g);
+        if (group.triangles.size() == 0)
+            continue;
+
+        RenMaterial renMat;
+        renMat.diffuse(RenColour(group.diffuseR, group.diffuseG, group.diffuseB, 1.0));
+
+        if (group.diffuseTexture.length() > 0)
+        {
+            RenTexture renTex = RenSurfaceManager::instance().createTexture(group.diffuseTexture);
+            renMat.texture(renTex);
+        }
+
+        RenIDistinctGroup* triangleGroup = _NEW(RenIDistinctGroup(renMat, group.triangles.size()));
+        for (size_t t = 0; t < group.triangles.size(); ++t)
+        {
+            const RenIObjTriangle& tri = group.triangles[t];
+            triangleGroup->addTriangle(
+                _STATIC_CAST(Ren::VertexIdx, tri.v0),
+                _STATIC_CAST(Ren::VertexIdx, tri.v1),
+                _STATIC_CAST(Ren::VertexIdx, tri.v2));
+        }
+        triangles_.push_back(triangleGroup);
+    }
+
+    checkMaxVertices(vertices_, maxVertices_);
+
+    DBG_LOAD0("Conversion succeeded" << std::endl);
+    return true;
 }
 
 // static

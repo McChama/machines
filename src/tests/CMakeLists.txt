@@ -16,7 +16,12 @@ FetchContent_MakeAvailable(Catch2)
 # provided by MACHINES_SOURCES; neither is relevant to, or resolvable by, a unit test binary.
 add_executable(machines_tests
     test_mexvec2.cpp
+    test_objmesh.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../libdev/afx/resource.cpp
+)
+
+target_compile_definitions(machines_tests PRIVATE
+    TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 
 # Mirrors the `libs` INTERFACE target's object library list (this project's engine is not

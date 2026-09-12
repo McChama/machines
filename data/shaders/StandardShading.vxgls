@@ -5,6 +5,11 @@ precision mediump float;
 in vec3 vertexPosition_modelspace;
 in vec2 vertexUV;
 in vec4 vertexColor;
+// A zero vector (the default for vertices never built via
+// RenIVertexData::addVertex()/addVertices() - UI, fonts, points, backgrounds,
+// etc.) means "no normal": the fragment shader falls back to using
+// vertexColor directly, unlit, exactly as before this change.
+in vec3 vertexNormal;
 
 // Output data ; will be interpolated for each fragment.
 out vec2 UV;
@@ -12,6 +17,10 @@ out vec4 fragmentColor;
 out vec4 viewSpace;
 out vec4 fragmentFogColour;
 out vec3 fragmentFogParams;
+// View-space normal and light direction, un-normalized (zero when there is no
+// real normal - see vertexNormal above); the fragment shader normalizes.
+out vec3 fragmentNormal;
+out vec3 fragmentLightDirection;
 
 // Values that stay constant for the whole mesh.
 uniform mat4 uM;
@@ -19,18 +28,28 @@ uniform mat4 uV;
 uniform mat4 uP;
 uniform vec3 uFogColour;
 uniform vec3 uFogParams;
+// Direction the light travels (matches RenDirectionalLight::direction()'s
+// convention), in world space.
+uniform vec3 uLightDirection;
 
 void main() {
 
 	// Output position of the vertex, in clip space : MVP * position
     mat4 MVP = uP * uV * uM;
 	gl_Position =  MVP * vec4(vertexPosition_modelspace,1);
-	
+
 	// UV of the vertex. No special space for this one.
     UV = vertexUV;
     fragmentColor = vec4(vertexColor[2],vertexColor[1],vertexColor[0],vertexColor[3]);
-    viewSpace = uV * uM * vec4(vertexPosition_modelspace,1); 
+    viewSpace = uV * uM * vec4(vertexPosition_modelspace,1);
     fragmentFogColour = vec4(uFogColour,1);
     fragmentFogParams = uFogParams;
+
+    // NB: assumes uniform (non-skewing) scale in uM - correct for this
+    // engine's rigid-part transforms, but would need the inverse-transpose
+    // normal matrix if that assumption stops holding.
+    mat3 normalMatrix = mat3(uV * uM);
+    fragmentNormal = normalMatrix * vertexNormal;
+    fragmentLightDirection = mat3(uV) * uLightDirection;
 }
 

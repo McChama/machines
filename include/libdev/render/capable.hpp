@@ -33,6 +33,10 @@ public:
 	bool supportsGammaCorrection()	const;
 	bool supports8BitsTexture()	const;
 
+	// GL_EXT_texture_filter_anisotropic support and the driver's reported max.
+	bool supportsAnisotropicFiltering() const;
+	float maxAnisotropy() const;
+
 	// The driver supports anti-aliasing.  More specifically, this returns true
 	// only if the type of anti-aliasing does not impose contraints on the
 	// rendering (some of them require the polygons rendered in order): modes having
