@@ -155,6 +155,14 @@
     // included) which #defines them as macros regardless.
     #include <iso646.h>
 
+    // strcasecmp()/strncasecmp() are POSIX, not present on MSVC at all - it
+    // has the same functions under different names. Called directly (not
+    // through a wrapper) all over this codebase, so redirect at the source
+    // rather than touch every call site.
+    #include <string.h>
+    #define strcasecmp  _stricmp
+    #define strncasecmp _strnicmp
+
     #define _SDLAPP
 
 #endif
