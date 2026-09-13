@@ -341,7 +341,33 @@ if(NOT ALURE_FOUND)
     # target (only its shared counterpart does), so consumers must do so
     # themselves - src/CMakeLists.txt already links ${OPENAL_LIBRARY}
     # alongside ${ALURE_LIBRARY} independently, so this matches.
-    set(ALURE_LIBRARY alure-static)
+    #
+    # The static library's actual CMake target name is NOT the literal
+    # "alure-static" this project assumed for a while - alure's own
+    # CMakeLists.txt embeds a 32/64-bit-dependent prefix into the target
+    # name itself (observed on this CI's MSVC/vcpkg toolchain as
+    # "ALURE32-static"), which previously caused
+    # target_link_libraries(... alure-static ...) to silently fall back to
+    # treating "alure-static" as a bare, nonexistent library name (no
+    # configure-time error) - failing only much later at the link step
+    # with "cannot open input file 'alure-static.lib'", after alure's own
+    # sources had already compiled and linked fine under their real name.
+    # Query the real name directly instead of hardcoding it, so this
+    # doesn't silently break again if a future CI image's bitness
+    # detection picks a different prefix.
+    get_property(_alure_buildsystem_targets DIRECTORY "${alure_src_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
+    set(ALURE_LIBRARY "")
+    foreach(_alure_candidate_target ${_alure_buildsystem_targets})
+        get_target_property(_alure_candidate_type ${_alure_candidate_target} TYPE)
+        if(_alure_candidate_type STREQUAL "STATIC_LIBRARY")
+            set(ALURE_LIBRARY ${_alure_candidate_target})
+        endif()
+    endforeach()
+    if(NOT ALURE_LIBRARY)
+        message(FATAL_ERROR "Could not determine alure's static library target name among: ${_alure_buildsystem_targets}")
+    endif()
+    message(STATUS "Alure static library target resolved to: ${ALURE_LIBRARY}")
+
     set(ALURE_INCLUDE_DIR ${alure_src_SOURCE_DIR}/include)
     set(ALURE_FOUND TRUE)
 endif()
