@@ -275,6 +275,17 @@ find_package(Alure QUIET)
 if(NOT ALURE_FOUND)
     message(STATUS "System Alure not found - fetching and building alure 1.2 from source")
 
+    # alure.h guards every one of its C API declarations behind ALURE_API,
+    # which - unless ALURE_STATIC_LIBRARY is defined - expands to
+    # __declspec(dllimport) on Windows (extern elsewhere, so this never
+    # bit Linux/macOS). We only ever build/link the static alure-*.lib
+    # here (BUILD_STATIC below), never a DLL, so without this define every
+    # call site expects an import-library entry that doesn't exist -
+    # "unresolved external symbol __imp_alureCreateStreamFromFile" etc.
+    # Must apply to any of our own code that includes <AL/alure.h>
+    # (currently just device/cd.cpp), not just alure's own build.
+    add_definitions(-DALURE_STATIC_LIBRARY)
+
     include(FetchContent)
     set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
