@@ -141,6 +141,13 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     message(STATUS "Detected MSVC compiler")
 
     set(NORMAL_CXX_FLAGS "/wd\"4244\" /wd\"4309\" /wd\"4800\" /wd\"4996\" /wd\"4351\" /EHsc") # disable some useless warnings
+    # TEMPORARY diagnostic-only noise reduction, same idea as the Clang-side
+    # one above (see PR #5): C4010 (1028 occurrences per full build - by far
+    # the single biggest contributor), C4068 (238) and C4273 (180) are
+    # drowning out the real compile error past the CI log tooling's
+    # retrievable-tail size cap. Not a permanent decision - revert once the
+    # real error underneath is found.
+    set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} /wd\"4010\" /wd\"4068\" /wd\"4273\"")
     set(RELEASE_CXX_FLAGS "/MD")
     set(DEBUG_CXX_FLAGS "/MDd /ZI")
     set(TEST_CXX_FLAGS "")
