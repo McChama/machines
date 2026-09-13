@@ -31,7 +31,7 @@ public:
         enum StartedFromLobby { LOBBY_START, NORMAL_START };
 
 private:
-        friend class AfxSingletonApp;
+        friend class AfxSingletonApp<SDLApp>;
         SDLApp();
 
         // Provide virtual fns required by base classes.

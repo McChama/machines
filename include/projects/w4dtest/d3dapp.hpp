@@ -52,7 +52,7 @@ class D3DApp : public AfxOSSpecificApp<D3DApp>
 public:
 	virtual ~D3DApp();
 private:
-	friend class AfxSingletonApp;
+	friend class AfxSingletonApp<D3DApp>;
 	D3DApp();
 
 	// Provide virtual fns required by base classes.

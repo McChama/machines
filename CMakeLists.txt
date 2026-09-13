@@ -305,6 +305,20 @@ if(NOT ALURE_FOUND)
         set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
         add_subdirectory(${alure_src_SOURCE_DIR} ${alure_src_BINARY_DIR})
         set(CMAKE_POLICY_VERSION_MINIMUM "${_alure_saved_policy_min}")
+
+        # alure-static's own CMakeLists.txt runs its own find_package(OpenAL)
+        # to find <AL/al.h> for its own sources, using CMake's classic
+        # variable-based FindOpenAL module - that works out of the box on
+        # Linux/macOS but doesn't resolve vcpkg's OpenAL on MSVC (vcpkg
+        # exposes OpenAL via a modern CONFIG package/target, not the
+        # OPENAL_INCLUDE_DIR variable classic MODULE-mode find_package()
+        # calls expect), so alure-static's own sources fail with "Cannot
+        # open include file: 'al.h'" there. Pass through the OpenAL include
+        # dir this project already resolved via its own find_package(OpenAL
+        # REQUIRED) above - a no-op where alure's own lookup already
+        # succeeds, since target_include_directories just adds a duplicate
+        # (deduplicated) entry there.
+        target_include_directories(alure-static PRIVATE ${OPENAL_INCLUDE_DIR})
     endif()
 
     # alure-static's own CMakeLists.txt never links OpenAL into the static
