@@ -81,21 +81,34 @@ const size_t NPOS = (size_t)(-1);
 
 	// exceptions implemented
 
+	// _TRY_BEGIN/_CATCH_ALL/_RERAISE are reserved identifiers already defined
+	// by MSVC's own <yvals.h> (pulled in transitively by <iostream> above)
+	// and used internally by its STL headers (e.g. inside <vector>'s
+	// exception-safe reallocation code). Redefining them here clobbers those
+	// definitions for the rest of the translation unit, breaking brace
+	// matching wherever the STL's own macro-expanded code is parsed later -
+	// this codebase never actually calls _TRY_BEGIN/_CATCH_ALL/_RERAISE
+	// itself (only _RAISE, which doesn't collide), so skip redefining the
+	// colliding three on MSVC and leave the STL's own versions intact.
+	#ifndef _MSC_VER
 	#define _TRY_BEGIN      try {
 	#define _CATCH_ALL      catch( ... ) {
+	#define _RERAISE( x )   throw
+	#endif
 	#define _CATCH_END      }
 	#define _RAISE( x )     throw( x )
-	#define _RERAISE( x )   throw
 
 #else
 
 	// exceptions revoked
 
+	#ifndef _MSC_VER
 	#define _TRY_BEGIN      {
 	#define _CATCH_ALL      {
+	#define _RERAISE( x )
+	#endif
 	#define _CATCH_END      }
 	#define _RAISE( x )
-	#define _RERAISE( x )
 
 #endif	/* #ifndef NO_EXCEPTIONS	*/
 
