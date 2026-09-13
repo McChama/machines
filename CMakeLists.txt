@@ -127,6 +127,12 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # hard-failing the build over, on AppleClang or any other Clang.
     set(NORMAL_CXX_FLAGS "-std=c++11 ${MACHINES_COMPILER_BIT_MODE} -Wall -Wold-style-cast -Wmissing-prototypes")
     set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-error=deprecated-declarations") # updated version of physfs is not available on some platforms so we keep using deprecated functions, see #958
+    # TEMPORARY diagnostic-only noise reduction: these categories fire on
+    # nearly every legacy macro expansion in this codebase and, on the macOS
+    # CI leg, drown the actual compile error out of the CI log tooling's
+    # retrievable tail window. Not a permanent style decision - revert once
+    # the real error underneath is found. See PR #5.
+    set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-old-style-cast -Wno-comment -Wno-extra-semi -Wno-reorder-ctor -Wno-delete-non-abstract-non-virtual-dtor -Wno-misleading-indentation -Wno-deprecated-declarations")
     set(RELEASE_CXX_FLAGS "-O2")
     set(DEBUG_CXX_FLAGS "-g -O0")
     set(TEST_CXX_FLAGS "-pthread")
