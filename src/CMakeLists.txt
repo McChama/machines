@@ -330,13 +330,20 @@ set_target_properties(machines planeted PROPERTIES
     COMPILE_FLAGS "${MACHINES_COMPILER_BIT_MODE}" LINK_FLAGS "${MACHINES_COMPILER_BIT_MODE}"
 )
 
-target_link_libraries(machines -static-libgcc -static-libstdc++)
-target_link_libraries(planeted -static-libgcc -static-libstdc++)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    # Statically link the GCC runtime/libstdc++ so the binary doesn't need a
+    # matching one on the target system at runtime - GCC/binutils-specific
+    # flags (and -Wl,-Bstatic/-Bdynamic is a GNU ld switch); Clang doesn't
+    # recognize -static-libgcc at all ("unsupported option"), and there's no
+    # separate libstdc++ to statically link against on macOS anyway (libc++
+    # is the system C++ library there, linked the ordinary dynamic way).
+    target_link_libraries(machines -static-libgcc -static-libstdc++)
+    target_link_libraries(planeted -static-libgcc -static-libstdc++)
+    target_link_libraries (machines -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
+    target_link_libraries (planeted -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
+endif()
 target_link_libraries(machines libs libs_mach_gui libaudio ${LIBS} )
 target_link_libraries(planeted libs libaudio ${LIBS} )
-
-target_link_libraries (machines -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
-target_link_libraries (planeted -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
