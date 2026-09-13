@@ -131,6 +131,24 @@
     //#define _WIN95APP
     #define _SDLAPP
 
+#elif defined(_MSC_VER)
+    // Native MSVC build (see the windows-msvc CI leg): the SDL2 port done in
+    // Phase 0/1.5 runs on every platform including this one, so - like the
+    // Clang/GCC branches above - this takes the _SDLAPP path, not the older
+    // _WIN95APP one (that's the pre-SDL2 native Win32/DirectX codepath).
+    #define _COMPILER_VERSION   _MSC_VER
+    #define _COMPILER_NAME      MSVC
+
+    #if defined(_WIN64)
+        /* 64 bit detected */
+        #include "base/limitw64.hpp"
+    #else
+        /* 32 bit detected */
+        #include "base/limitw32.hpp"
+    #endif
+
+    #define _SDLAPP
+
 #endif
 
 //////////////////////////////////////////////////////////////////////
