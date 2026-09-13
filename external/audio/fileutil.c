@@ -32,9 +32,14 @@
 #include	<audio/Aos.h>
 #include	<audio/fileutil.h>
 
-#if defined(HAVE_STDLIB_H)
-# include <stdlib.h>
-#endif
+// HAVE_STDLIB_H would normally come from config.h (see the #include above,
+// disabled - this vendored NCD/nas source predates this project's build),
+// so it's never actually defined and stdlib.h (where malloc/free/realloc
+// are declared) never got included on any platform. GCC only warns on an
+// implicit function declaration; Clang treats it as a hard error, so this
+// only ever surfaced on the macOS CI leg. stdlib.h is always available -
+// include it unconditionally instead of gating on a macro nothing sets.
+#include <stdlib.h>
 
 #if defined(HAVE_MALLOC_H)
 # include <malloc.h>

@@ -30,9 +30,10 @@
 
 #include	<stdio.h>
 
-#if defined(HAVE_STDLIB_H)
-# include <stdlib.h>
-#endif
+// Same HAVE_STDLIB_H gap as fileutil.c in this directory - config.h is
+// disabled above, so this macro is never actually defined and stdlib.h
+// never got included on any platform. Include it unconditionally instead.
+#include <stdlib.h>
 
 #if defined(HAVE_MALLOC_H)
 # include <malloc.h>
