@@ -132,7 +132,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # CI leg, drown the actual compile error out of the CI log tooling's
     # retrievable tail window. Not a permanent style decision - revert once
     # the real error underneath is found. See PR #5.
-    set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-old-style-cast -Wno-comment -Wno-extra-semi -Wno-reorder-ctor -Wno-delete-non-abstract-non-virtual-dtor -Wno-misleading-indentation -Wno-deprecated-declarations")
+    set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-old-style-cast -Wno-comment -Wno-extra-semi -Wno-reorder-ctor -Wno-delete-non-abstract-non-virtual-dtor -Wno-misleading-indentation -Wno-deprecated-declarations -Wno-unknown-pragmas -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch -Wno-mismatched-tags -Wno-missing-prototypes -Wno-overloaded-virtual -Wno-macro-redefined")
     set(RELEASE_CXX_FLAGS "-O2")
     set(DEBUG_CXX_FLAGS "-g -O0")
     set(TEST_CXX_FLAGS "-pthread")
