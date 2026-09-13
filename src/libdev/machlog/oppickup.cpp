@@ -30,7 +30,7 @@ PER_DEFINE_PERSISTENT( MachLogPickUpOperation );
 #define CB_MachLogPickUpOperation_DEPIMPL()	\
 		PRE( pImpl_ );	\
 		CB_DEPIMPL( MachLogResourceCarrier*, pActor_ ); \
-    	CB_DEPIMPL( bool, finished_ ); \	
+    	CB_DEPIMPL( bool, finished_ ); \
 		CB_DEPIMPL( MexPoint2d, destinationPadPosition_ )
 
 /* //////////////////////////////////////////////////////////////// */
