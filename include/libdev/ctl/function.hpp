@@ -14,7 +14,6 @@
 
 template < class FIRST, class SECOND >
 struct ctl_select1st
-: public std::unary_function< std::pair< FIRST, SECOND >, FIRST >
 {
 	FIRST& operator ()( std::pair< FIRST, SECOND >& p ) const
 	{
@@ -31,7 +30,6 @@ struct ctl_select1st
 
 template < class FIRST, class SECOND >
 struct ctl_select2nd
-: public std::unary_function< std::pair< FIRST, SECOND >, SECOND >
 {
 	SECOND& operator ()( std::pair< FIRST, SECOND >& p ) const
 	{
