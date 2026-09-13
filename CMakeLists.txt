@@ -144,7 +144,16 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(RELEASE_CXX_FLAGS "/MD")
     set(DEBUG_CXX_FLAGS "/MDd /ZI")
     set(TEST_CXX_FLAGS "")
-    add_definitions(-DNOEXCEPT= -DHAS_MSVC_EXCEPTION_BUG)
+    # NOMINMAX: src/libdev/sim/manager.cpp hit "error C2589: '(' illegal token
+    # on right side of '::'" on `std::max( biasMaxCPU, ... )` - the textbook
+    # signature of the `max`/`min` object-like macros that <windows.h> (or a
+    # Windows SDK header pulled in transitively by the CRT/STL on this
+    # toolset) defines, silently shadowing std::max/std::min wherever they get
+    # used unqualified-macro-style. NOMINMAX is the standard prevention (used
+    # throughout Microsoft's own STL headers) - defining it is a no-op if
+    # windows.h isn't actually in play anywhere, so it's safe regardless of
+    # which header turns out to be responsible.
+    add_definitions(-DNOEXCEPT= -DHAS_MSVC_EXCEPTION_BUG -DNOMINMAX)
 
     # _HAS_AUTO_PTR_ETC=1 (tried in an earlier commit, meant to restore
     # std::binary_function for base/lessptr.hpp) turned out not to do that on
