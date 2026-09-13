@@ -221,6 +221,16 @@ set(LIBS
     ${ENET_LIBRARY}
 )
 
+if(PLATFORM_WINDOWS)
+    # ENet needs Winsock2 (socket/byte-order functions) and winmm (its timer
+    # calls) - on MSVC these aren't linked by default the way they can be
+    # under some MinGW toolchain specs, so enet.lib fails to resolve
+    # __imp_WSAGetLastError/__imp_htonl/__imp_ntohl/etc. Link them
+    # explicitly for every Windows target; harmless if a given toolchain
+    # already pulls them in some other way.
+    set(LIBS ${LIBS} ws2_32 winmm)
+endif()
+
 set(MACHINES_LIBS ${LIBS} PARENT_SCOPE)
 
 
