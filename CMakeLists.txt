@@ -194,6 +194,22 @@ if(APPLE)
     # actually included - "LAST" makes Homebrew's copy win instead, only
     # falling back to the framework if nothing else provides it.
     set(CMAKE_FIND_FRAMEWORK LAST)
+
+    # Homebrew's openal-soft is keg-only (it deliberately doesn't symlink into
+    # the general Homebrew prefix, precisely so it doesn't shadow Apple's
+    # framework) - so plain -DCMAKE_PREFIX_PATH="$(brew --prefix)" alone
+    # never makes it visible to find_package() at all, regardless of the
+    # CMAKE_FIND_FRAMEWORK setting above. Ask brew for its actual keg path
+    # and add that instead.
+    execute_process(
+        COMMAND brew --prefix openal-soft
+        OUTPUT_VARIABLE HOMEBREW_OPENAL_SOFT_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(HOMEBREW_OPENAL_SOFT_PREFIX)
+        list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_OPENAL_SOFT_PREFIX}")
+    endif()
 endif()
 
 find_package(OpenGL 2.1 REQUIRED)
@@ -202,6 +218,19 @@ find_package(SDL2_image REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(GLM REQUIRED)
 find_package(OpenAL REQUIRED)
+
+if(APPLE)
+    # FindOpenAL.cmake's OPENAL_INCLUDE_DIR points directly at the directory
+    # containing al.h (its own docs say to write #include "al.h", not
+    # #include <AL/al.h>) - e.g. .../include/AL, not .../include. On Linux
+    # this goes unnoticed because /usr/include (the parent) is always on the
+    # compiler's implicit default search path regardless of what -I flags are
+    # passed, but macOS has no such implicit fallback for a Homebrew prefix,
+    # so this codebase's uniform #include <AL/al.h> needs that parent
+    # directory added explicitly too.
+    get_filename_component(OPENAL_INCLUDE_PARENT_DIR "${OPENAL_INCLUDE_DIR}" DIRECTORY)
+    list(APPEND OPENAL_INCLUDE_DIR "${OPENAL_INCLUDE_PARENT_DIR}")
+endif()
 
 # Classic Alure 1.x has no vcpkg port or Homebrew formula, so it isn't findable
 # out of the box on MSVC/macOS (Linux apt and the bundled windows/ MinGW libs
