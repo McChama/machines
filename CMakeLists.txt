@@ -146,13 +146,18 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(TEST_CXX_FLAGS "")
     add_definitions(-DNOEXCEPT= -DHAS_MSVC_EXCEPTION_BUG)
 
-    # This codebase uses std::binary_function/unary_function/auto_ptr/mem_fun
-    # (base/lessptr.hpp, the vendored alure headers, etc.) - all removed from
-    # MSVC's STL by default once _HAS_CXX17 is on (its default depends on the
-    # toolset's own default /std). _HAS_AUTO_PTR_ETC=1 restores them for
-    # backward compatibility; the _SILENCE_* define quiets the deprecation
-    # warning that comes with turning it back on.
-    add_definitions(-D_HAS_AUTO_PTR_ETC=1 -D_SILENCE_CXX17_ADAPTOR_TYPEDEFS_DEPRECATION_WARNING)
+    # _HAS_AUTO_PTR_ETC=1 (tried in an earlier commit, meant to restore
+    # std::binary_function for base/lessptr.hpp) turned out not to do that on
+    # this MSVC version - lessptr.hpp was fixed a different way instead (drop
+    # the unnecessary base entirely). Suspect now: forcing this flag on may be
+    # what's corrupting an unrelated MSVC STL internal ("<vector>(459,14):
+    # error C1075: '{' no matching token found", appearing identically across
+    # many otherwise-unrelated translation units) - re-enabling deprecated
+    # compatibility code paths that may no longer fully exist in this
+    # toolset's actual headers. Removed; nothing left in this codebase's own
+    # source needs it (std::auto_ptr is still used in the vendored alure
+    # headers, not yet reached by this build - a problem for when we get
+    # there, separately).
 
     # Needed for Debug information (it's set to "No" by default for some reason)
     set(CMAKE_EXE_LINKER_FLAGS_DEBUG "/DEBUG")
