@@ -14,6 +14,10 @@
 
 #include "base/base.hpp"
 
+#ifndef _MSC_VER
+    #include <pthread.h>
+#endif
+
 class BaseLogBuffer;
 
 //TODO: handle timer
@@ -133,7 +137,14 @@ private:
     bool isBufferingOutput_;
     BaseLogBuffer* pMemoryBuffer_;
     bool crashOnPrint_; //true if a crash should be induced on call from EPI/PRO to print the stack
+#ifdef _MSC_VER
     long unsigned int threadId;
+#else
+    // pthread_t is unsigned long on Linux (glibc) but an opaque pointer type
+    // on macOS/BSD (libc) - pthread_create() needs the real type, not a
+    // same-size-on-Linux-only stand-in.
+    pthread_t threadId;
+#endif
 };
 
 
