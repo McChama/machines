@@ -121,7 +121,11 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
     message(STATUS "Detected Clang version 3.1+")
 
-    set(NORMAL_CXX_FLAGS "-std=c++11 ${MACHINES_COMPILER_BIT_MODE} -Wall -Werror -Wold-style-cast -pedantic-errors -Wmissing-prototypes")
+    # No -Werror/-pedantic-errors: same call Phase 0 made for GCC (see the GCC
+    # branch above) - this 1999 codebase trips plenty of legacy-style warnings
+    # (old-style casts, extra semicolons, multi-line comments) that aren't worth
+    # hard-failing the build over, on AppleClang or any other Clang.
+    set(NORMAL_CXX_FLAGS "-std=c++11 ${MACHINES_COMPILER_BIT_MODE} -Wall -Wold-style-cast -Wmissing-prototypes")
     set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-error=deprecated-declarations") # updated version of physfs is not available on some platforms so we keep using deprecated functions, see #958
     set(RELEASE_CXX_FLAGS "-O2")
     set(DEBUG_CXX_FLAGS "-g -O0")
@@ -245,28 +249,48 @@ if(NOT DEV_BUILD)
 endif()
 
 if(PLATFORM_WINDOWS)
-  if(NOT BUILD_32)
-    find_library(MSVCRT_LIBRARY msvcrt HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(FREETYPE_LIBRARY freetype HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(HARFBUZZ_LIBRARY harfbuzz HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(BZ2_LIBRARY bz2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(PNG16_LIBRARY png16 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(GRAPHITE2_LIBRARY graphite2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(Z_LIBRARY z HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(RPCRT4_LIBRARY rpcrt4 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(USP10_LIBRARY usp10 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    # Windows 64-bit libraries
-    set(LIBS
-        ${MSVCRT_LIBRARY}
-        ${FREETYPE_LIBRARY}
-        ${HARFBUZZ_LIBRARY}
-        ${BZ2_LIBRARY}
-        ${PNG16_LIBRARY}
-        ${GRAPHITE2_LIBRARY}
-        ${Z_LIBRARY}
-        ${RPCRT4_LIBRARY}
-        ${USP10_LIBRARY}
-    )
+  if(DEFINED WINDOWS_DEPENDENCIES_DIR)
+    # MinGW cross build (see cmake/Toolchain-mingw64.cmake): links directly against
+    # the prebuilt windows/lib64/libfreetype.a, which was statically built bundling
+    # harfbuzz/graphite2/bz2/png16/zlib - none of those are otherwise on the link
+    # line, so they have to be resolved and linked explicitly here.
+    if(NOT BUILD_32)
+      find_library(MSVCRT_LIBRARY msvcrt HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(FREETYPE_LIBRARY freetype HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(HARFBUZZ_LIBRARY harfbuzz HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(BZ2_LIBRARY bz2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(PNG16_LIBRARY png16 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(GRAPHITE2_LIBRARY graphite2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(Z_LIBRARY z HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(RPCRT4_LIBRARY rpcrt4 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(USP10_LIBRARY usp10 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      # Windows 64-bit libraries
+      set(LIBS
+          ${MSVCRT_LIBRARY}
+          ${FREETYPE_LIBRARY}
+          ${HARFBUZZ_LIBRARY}
+          ${BZ2_LIBRARY}
+          ${PNG16_LIBRARY}
+          ${GRAPHITE2_LIBRARY}
+          ${Z_LIBRARY}
+          ${RPCRT4_LIBRARY}
+          ${USP10_LIBRARY}
+      )
+    endif()
+  else()
+    # Native MSVC build (vcpkg toolchain, no WINDOWS_DEPENDENCIES_DIR set): the
+    # find_library() calls above hunted for standalone harfbuzz/graphite2/msvcrt/
+    # rpcrt4/usp10 libs that don't exist in this toolchain (vcpkg's freetype port
+    # doesn't build/export those, and find_library() can't see the Windows SDK/CRT
+    # library dirs the MSVC linker already knows about) and hard-failed CMake
+    # configure with NOTFOUND. find_package(Freetype REQUIRED) above already
+    # resolved the real Freetype::Freetype target for this toolchain (including
+    # whatever it actually needs transitively), so just use that.
+    if(TARGET Freetype::Freetype)
+      set(FREETYPE_LIBRARY Freetype::Freetype)
+    else()
+      set(FREETYPE_LIBRARY ${FREETYPE_LIBRARIES})
+    endif()
   endif()
 endif()
 

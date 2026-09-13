@@ -74,7 +74,36 @@
 
 #endif  /*  #ifdef __WATCOMC__  */
 
-#ifdef __GNUC__
+// Clang (including Apple's fork) defines __GNUC__ too, for source
+// compatibility, but always reports it as 4 regardless of the real Clang
+// version - so it must be detected ahead of the "#ifdef __GNUC__" branch
+// below, or "#if __GNUC__ >= 5" never fires and _COMPILER_VERSION is left
+// undefined (hits the "#error This version of the compiler is not catered
+// for" below).
+#ifdef __clang__
+    #define _COMPILER_VERSION   __clang_major__
+    #define _COMPILER_NAME      GCC
+
+    #if defined(__x86_64__)
+        /* 64 bit detected */
+        #include "base/limitw64.hpp"
+    #endif
+    #if defined(__aarch64__)
+        /* 64 bit arm detected */
+        #include "base/limitw64.hpp"
+    #endif
+    #if defined(__i386__)
+        /* 32 bit x86 detected */
+        #include "base/limitw32.hpp"
+    #endif
+    #if defined(__arm__)
+        /* 32 bit arm detected */
+        #include "base/limitw32.hpp"
+    #endif
+
+    #define _SDLAPP
+
+#elif defined(__GNUC__)
     #if __GNUC__ >= 5
         //#include "base/watc1060.hpp"
         #define _COMPILER_VERSION
