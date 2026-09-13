@@ -12,11 +12,20 @@
 
 typedef void fvoid_t();
 
-void terminate();
-fvoid_t *set_terminate( fvoid_t * );
+// Not declared for MSVC: nothing in this codebase actually calls
+// terminate()/set_terminate()/unexpected()/set_unexpected() (grep confirms
+// exceptio.cpp is the only place that references them), but MSVC's own CRT
+// already declares globals of these exact names with a different exception
+// specification, so redeclaring them here is a hard conflict there
+// ("redefinition; different exception specifications") - not a portability
+// gap to work around, just dead legacy code with nothing depending on it.
+#ifndef _MSC_VER
+    void terminate();
+    fvoid_t *set_terminate( fvoid_t * );
 
-void unexpected();
-fvoid_t *set_unexpected( fvoid_t * );
+    void unexpected();
+    fvoid_t *set_unexpected( fvoid_t * );
+#endif
 
 //////////////////////////////////////////////////////////////////////
 
