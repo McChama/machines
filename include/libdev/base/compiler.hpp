@@ -147,6 +147,14 @@
         #include "base/limitw32.hpp"
     #endif
 
+    // This codebase writes "not"/"and"/"or" throughout (PRE/INVARIANT/implies
+    // etc.), relying on the standard alternative operator spellings. GCC and
+    // Clang recognize these at the lexer level unconditionally; MSVC only
+    // does under certain conformance settings, so pull in the standard
+    // <iso646.h> (present on every hosted implementation, MSVC's UCRT
+    // included) which #defines them as macros regardless.
+    #include <iso646.h>
+
     #define _SDLAPP
 
 #endif
