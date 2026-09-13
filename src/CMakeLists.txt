@@ -267,6 +267,21 @@ link_directories(
 
 # Targets
 
+# render and machlog are STATIC, not OBJECT like every other library here:
+# on MSVC specifically, 9 functions spread across just 4 render/*.cpp and
+# 2 machlog/*.cpp files (RenDevice::renderPrimitive/renderIndexed/
+# renderScreenspace/renderIndexedScreenspace, RenIDelayedAlphaGroup's and
+# RenIDelayedCoplanarGroup's constructors, RenIIlluminator::applyMaterial,
+# MachLogRemoteFirstPersonManager::actorState,
+# MachLogMessageBroker::sendFirstPersonUpdateMessage) consistently fail to
+# link ("unresolved external symbol") despite compiling cleanly with
+# matching declarations/definitions and no preprocessor guards - while
+# hundreds of other functions from these same two libraries link fine.
+# Every other OBJECT library here (aggregated below via $<TARGET_OBJECTS:>)
+# is unaffected; render and machlog are also the two largest by file count.
+# Building them as real static libraries instead sidesteps whatever
+# CMake/Visual-Studio-generator OBJECT-library quirk this is - GCC/Clang
+# (Linux/macOS) were never affected either way.
 add_library(base        OBJECT ${BASE_SOURCES})
 add_library(mathex      OBJECT ${MATHEX_SOURCES})
 add_library(afx         OBJECT ${AFX_SOURCES})
@@ -278,7 +293,7 @@ add_library(world4d     OBJECT ${WORLD4D_SOURCES})
 add_library(gxin        OBJECT ${GXIN_SOURCES})
 add_library(xin         OBJECT ${XIN_SOURCES})
 add_library(stdlib      OBJECT ${STDLIB_SOURCES})
-add_library(render      OBJECT ${RENDER_SOURCES})
+add_library(render      STATIC ${RENDER_SOURCES})
 add_library(sound       OBJECT ${SOUND_SOURCES})
 add_library(network     OBJECT ${NETWORK_SOURCES})
 add_library(ctl         OBJECT ${CTL_SOURCES})
@@ -290,14 +305,14 @@ add_library(machphys    OBJECT ${MACHPHYS_SOURCES})
 add_library(ani         OBJECT ${ANI_SOURCES})
 add_library(recorder    OBJECT ${RECORDER_SOURCES})
 add_library(envirnmt    OBJECT ${ENVIRNMT_SOURCES})
-add_library(machlog     OBJECT ${MACHLOG_SOURCES})
+add_library(machlog     STATIC ${MACHLOG_SOURCES})
 add_library(libsmacker  OBJECT ${LIBSMACKER_SOURCES})
 add_library(libaudio    STATIC ${LIBAUDIO_SOURCES})
 
 add_library(libs INTERFACE)
 target_sources(libs
 
-    INTERFACE 
+    INTERFACE
     $<TARGET_OBJECTS:base>
     $<TARGET_OBJECTS:mathex>
     $<TARGET_OBJECTS:afx>
@@ -309,7 +324,6 @@ target_sources(libs
     $<TARGET_OBJECTS:gxin>
     $<TARGET_OBJECTS:xin>
     $<TARGET_OBJECTS:stdlib>
-    $<TARGET_OBJECTS:render>
     $<TARGET_OBJECTS:sound>
     $<TARGET_OBJECTS:network>
     $<TARGET_OBJECTS:ctl>
@@ -319,9 +333,18 @@ target_sources(libs
     $<TARGET_OBJECTS:recorder>
     $<TARGET_OBJECTS:envirnmt>
     $<TARGET_OBJECTS:machphys>
-    $<TARGET_OBJECTS:machlog>
 
 )
+# render and machlog are linked as real STATIC libraries (below), not
+# aggregated here via $<TARGET_OBJECTS:> like the rest - see the
+# add_library(render/machlog STATIC ...) comment for why. Unlike the
+# OBJECT libraries above (whose members are all included unconditionally,
+# so ordering never matters), static libraries only pull in members that
+# resolve a symbol already needed at the point they're searched - listing
+# both twice is a cheap, standard way to cover a mutual dependency between
+# them (game logic in machlog calling into render, and vice versa) without
+# having to work out and hand-maintain the real one-way ordering.
+target_link_libraries(libs INTERFACE render machlog render machlog)
 
 add_library(libs_mach_gui INTERFACE)
 target_sources(libs_mach_gui 
