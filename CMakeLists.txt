@@ -183,6 +183,19 @@ else()
     set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB32_PATHS OFF)
 endif()
 
+if(APPLE)
+    # find_package(OpenAL) below defaults to CMake's normal "FIRST" framework
+    # search order, which on macOS means the deprecated system
+    # /System/Library/Frameworks/OpenAL.framework gets picked over Homebrew's
+    # openal-soft even when it's installed (see the macOS CI leg's "brew
+    # install ... openal-soft"). This codebase includes <AL/al.h> (the
+    # classic Linux/Homebrew header layout), not the framework's
+    # <OpenAL/al.h>, so the system framework's headers don't match what's
+    # actually included - "LAST" makes Homebrew's copy win instead, only
+    # falling back to the framework if nothing else provides it.
+    set(CMAKE_FIND_FRAMEWORK LAST)
+endif()
+
 find_package(OpenGL 2.1 REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
