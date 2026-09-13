@@ -278,6 +278,18 @@ if(NOT ALURE_FOUND)
     include(FetchContent)
     set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    # alure 1.2's CMakeLists.txt gates its static "alure-static" target
+    # behind its own BUILD_STATIC option, which we never forced on - only
+    # BUILD_SHARED (disabled above) and BUILD_EXAMPLES. On MSVC this left
+    # neither the shared nor the static alure target defined at all: no
+    # compile activity for it anywhere in the build, and
+    # target_link_libraries(... alure-static ...) below silently fell back
+    # to treating "alure-static" as a bare (nonexistent) library name
+    # instead of a real target - no configure-time error, just a link
+    # failure later ("cannot open input file 'alure-static.lib'"). Force it
+    # on explicitly so the target this project actually links against
+    # (ALURE_LIBRARY, set to alure-static below) always gets built.
+    set(BUILD_STATIC ON CACHE BOOL "" FORCE)
 
     FetchContent_Declare(alure_src
         URL https://archive.ubuntu.com/ubuntu/pool/universe/a/alure/alure_1.2.orig.tar.bz2
