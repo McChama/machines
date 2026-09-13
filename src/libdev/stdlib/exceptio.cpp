@@ -277,6 +277,9 @@ void bad_alloc::do_raise() { _RAISE( *this ); }
 
 //////////////////////////////////////////////////////////////////////
 
+// Not defined for MSVC - see the matching #ifndef _MSC_VER in exceptio.hpp.
+#ifndef _MSC_VER
+
 static fvoid_t *terminate_handler = &abort;
 
 fvoid_t *set_terminate( fvoid_t *newh )
@@ -314,6 +317,8 @@ void unexpected()
 
     terminate();
 }
+
+#endif // _MSC_VER
 
 /* End EXCEPTIO.CPP *************************************************/
 

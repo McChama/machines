@@ -74,7 +74,36 @@
 
 #endif  /*  #ifdef __WATCOMC__  */
 
-#ifdef __GNUC__
+// Clang (including Apple's fork) defines __GNUC__ too, for source
+// compatibility, but always reports it as 4 regardless of the real Clang
+// version - so it must be detected ahead of the "#ifdef __GNUC__" branch
+// below, or "#if __GNUC__ >= 5" never fires and _COMPILER_VERSION is left
+// undefined (hits the "#error This version of the compiler is not catered
+// for" below).
+#ifdef __clang__
+    #define _COMPILER_VERSION   __clang_major__
+    #define _COMPILER_NAME      GCC
+
+    #if defined(__x86_64__)
+        /* 64 bit detected */
+        #include "base/limitw64.hpp"
+    #endif
+    #if defined(__aarch64__)
+        /* 64 bit arm detected */
+        #include "base/limitw64.hpp"
+    #endif
+    #if defined(__i386__)
+        /* 32 bit x86 detected */
+        #include "base/limitw32.hpp"
+    #endif
+    #if defined(__arm__)
+        /* 32 bit arm detected */
+        #include "base/limitw32.hpp"
+    #endif
+
+    #define _SDLAPP
+
+#elif defined(__GNUC__)
     #if __GNUC__ >= 5
         //#include "base/watc1060.hpp"
         #define _COMPILER_VERSION
@@ -100,6 +129,40 @@
     #endif
 
     //#define _WIN95APP
+    #define _SDLAPP
+
+#elif defined(_MSC_VER)
+    // Native MSVC build (see the windows-msvc CI leg): the SDL2 port done in
+    // Phase 0/1.5 runs on every platform including this one, so - like the
+    // Clang/GCC branches above - this takes the _SDLAPP path, not the older
+    // _WIN95APP one (that's the pre-SDL2 native Win32/DirectX codepath).
+    #define _COMPILER_VERSION   _MSC_VER
+    #define _COMPILER_NAME      MSVC
+
+    #if defined(_WIN64)
+        /* 64 bit detected */
+        #include "base/limitw64.hpp"
+    #else
+        /* 32 bit detected */
+        #include "base/limitw32.hpp"
+    #endif
+
+    // This codebase writes "not"/"and"/"or" throughout (PRE/INVARIANT/implies
+    // etc.), relying on the standard alternative operator spellings. GCC and
+    // Clang recognize these at the lexer level unconditionally; MSVC only
+    // does under certain conformance settings, so pull in the standard
+    // <iso646.h> (present on every hosted implementation, MSVC's UCRT
+    // included) which #defines them as macros regardless.
+    #include <iso646.h>
+
+    // strcasecmp()/strncasecmp() are POSIX, not present on MSVC at all - it
+    // has the same functions under different names. Called directly (not
+    // through a wrapper) all over this codebase, so redirect at the source
+    // rather than touch every call site.
+    #include <string.h>
+    #define strcasecmp  _stricmp
+    #define strncasecmp _strnicmp
+
     #define _SDLAPP
 
 #endif

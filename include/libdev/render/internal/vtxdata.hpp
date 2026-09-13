@@ -112,7 +112,7 @@ public:
 	void createMaterialMap();							// POST(materialMap());
 	void resetAllMaterials();
 
-	Base::size;
+	using Base::size;
 
 	// Remove all the vertices, the normals and any maps.
 	void eraseAll();

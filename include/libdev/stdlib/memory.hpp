@@ -10,7 +10,14 @@
 
 //////////////////////////////////////////////////////////////////////
 
-void * operator new( size_t, void * );
+// Must match <new>'s own placement-new exception spec (noexcept since
+// C++11) or redeclaring it here is an outright conflict - libc++ (macOS)
+// enforces this strictly ("missing exception specification 'noexcept'"),
+// libstdc++ doesn't seem to hit it in practice but matching is still
+// correct there too. NOEXCEPT is this project's own compiler-flag-driven
+// macro for exactly this (empty on MSVC, which CMakeLists.txt notes has
+// its own noexcept-related compiler bug).
+void * operator new( size_t, void * ) NOEXCEPT;
 
 //////////////////////////////////////////////////////////////////////
 

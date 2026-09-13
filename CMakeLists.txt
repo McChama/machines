@@ -121,8 +121,18 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
     message(STATUS "Detected Clang version 3.1+")
 
-    set(NORMAL_CXX_FLAGS "-std=c++11 ${MACHINES_COMPILER_BIT_MODE} -Wall -Werror -Wold-style-cast -pedantic-errors -Wmissing-prototypes")
+    # No -Werror/-pedantic-errors: same call Phase 0 made for GCC (see the GCC
+    # branch above) - this 1999 codebase trips plenty of legacy-style warnings
+    # (old-style casts, extra semicolons, multi-line comments) that aren't worth
+    # hard-failing the build over, on AppleClang or any other Clang.
+    set(NORMAL_CXX_FLAGS "-std=c++11 ${MACHINES_COMPILER_BIT_MODE} -Wall -Wold-style-cast -Wmissing-prototypes")
     set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-error=deprecated-declarations") # updated version of physfs is not available on some platforms so we keep using deprecated functions, see #958
+    # TEMPORARY diagnostic-only noise reduction: these categories fire on
+    # nearly every legacy macro expansion in this codebase and, on the macOS
+    # CI leg, drown the actual compile error out of the CI log tooling's
+    # retrievable tail window. Not a permanent style decision - revert once
+    # the real error underneath is found. See PR #5.
+    set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} -Wno-old-style-cast -Wno-comment -Wno-extra-semi -Wno-reorder-ctor -Wno-delete-non-abstract-non-virtual-dtor -Wno-misleading-indentation -Wno-deprecated-declarations -Wno-unknown-pragmas -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch -Wno-mismatched-tags -Wno-missing-prototypes -Wno-overloaded-virtual -Wno-macro-redefined")
     set(RELEASE_CXX_FLAGS "-O2")
     set(DEBUG_CXX_FLAGS "-g -O0")
     set(TEST_CXX_FLAGS "-pthread")
@@ -131,10 +141,39 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     message(STATUS "Detected MSVC compiler")
 
     set(NORMAL_CXX_FLAGS "/wd\"4244\" /wd\"4309\" /wd\"4800\" /wd\"4996\" /wd\"4351\" /EHsc") # disable some useless warnings
+    # TEMPORARY diagnostic-only noise reduction, same idea as the Clang-side
+    # one above (see PR #5): C4010 (1028 occurrences per full build - by far
+    # the single biggest contributor), C4068 (238) and C4273 (180) are
+    # drowning out the real compile error past the CI log tooling's
+    # retrievable-tail size cap. Not a permanent decision - revert once the
+    # real error underneath is found.
+    set(NORMAL_CXX_FLAGS "${NORMAL_CXX_FLAGS} /wd\"4010\" /wd\"4068\" /wd\"4273\"")
     set(RELEASE_CXX_FLAGS "/MD")
     set(DEBUG_CXX_FLAGS "/MDd /ZI")
     set(TEST_CXX_FLAGS "")
-    add_definitions(-DNOEXCEPT= -DHAS_MSVC_EXCEPTION_BUG)
+    # NOMINMAX: src/libdev/sim/manager.cpp hit "error C2589: '(' illegal token
+    # on right side of '::'" on `std::max( biasMaxCPU, ... )` - the textbook
+    # signature of the `max`/`min` object-like macros that <windows.h> (or a
+    # Windows SDK header pulled in transitively by the CRT/STL on this
+    # toolset) defines, silently shadowing std::max/std::min wherever they get
+    # used unqualified-macro-style. NOMINMAX is the standard prevention (used
+    # throughout Microsoft's own STL headers) - defining it is a no-op if
+    # windows.h isn't actually in play anywhere, so it's safe regardless of
+    # which header turns out to be responsible.
+    add_definitions(-DNOEXCEPT= -DHAS_MSVC_EXCEPTION_BUG -DNOMINMAX)
+
+    # _HAS_AUTO_PTR_ETC=1 (tried in an earlier commit, meant to restore
+    # std::binary_function for base/lessptr.hpp) turned out not to do that on
+    # this MSVC version - lessptr.hpp was fixed a different way instead (drop
+    # the unnecessary base entirely). Suspect now: forcing this flag on may be
+    # what's corrupting an unrelated MSVC STL internal ("<vector>(459,14):
+    # error C1075: '{' no matching token found", appearing identically across
+    # many otherwise-unrelated translation units) - re-enabling deprecated
+    # compatibility code paths that may no longer fully exist in this
+    # toolset's actual headers. Removed; nothing left in this codebase's own
+    # source needs it (std::auto_ptr is still used in the vendored alure
+    # headers, not yet reached by this build - a problem for when we get
+    # there, separately).
 
     # Needed for Debug information (it's set to "No" by default for some reason)
     set(CMAKE_EXE_LINKER_FLAGS_DEBUG "/DEBUG")
@@ -179,12 +218,54 @@ else()
     set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB32_PATHS OFF)
 endif()
 
+if(APPLE)
+    # find_package(OpenAL) below defaults to CMake's normal "FIRST" framework
+    # search order, which on macOS means the deprecated system
+    # /System/Library/Frameworks/OpenAL.framework gets picked over Homebrew's
+    # openal-soft even when it's installed (see the macOS CI leg's "brew
+    # install ... openal-soft"). This codebase includes <AL/al.h> (the
+    # classic Linux/Homebrew header layout), not the framework's
+    # <OpenAL/al.h>, so the system framework's headers don't match what's
+    # actually included - "LAST" makes Homebrew's copy win instead, only
+    # falling back to the framework if nothing else provides it.
+    set(CMAKE_FIND_FRAMEWORK LAST)
+
+    # Homebrew's openal-soft is keg-only (it deliberately doesn't symlink into
+    # the general Homebrew prefix, precisely so it doesn't shadow Apple's
+    # framework) - so plain -DCMAKE_PREFIX_PATH="$(brew --prefix)" alone
+    # never makes it visible to find_package() at all, regardless of the
+    # CMAKE_FIND_FRAMEWORK setting above. Ask brew for its actual keg path
+    # and add that instead.
+    execute_process(
+        COMMAND brew --prefix openal-soft
+        OUTPUT_VARIABLE HOMEBREW_OPENAL_SOFT_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(HOMEBREW_OPENAL_SOFT_PREFIX)
+        list(APPEND CMAKE_PREFIX_PATH "${HOMEBREW_OPENAL_SOFT_PREFIX}")
+    endif()
+endif()
+
 find_package(OpenGL 2.1 REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(GLM REQUIRED)
 find_package(OpenAL REQUIRED)
+
+if(APPLE)
+    # FindOpenAL.cmake's OPENAL_INCLUDE_DIR points directly at the directory
+    # containing al.h (its own docs say to write #include "al.h", not
+    # #include <AL/al.h>) - e.g. .../include/AL, not .../include. On Linux
+    # this goes unnoticed because /usr/include (the parent) is always on the
+    # compiler's implicit default search path regardless of what -I flags are
+    # passed, but macOS has no such implicit fallback for a Homebrew prefix,
+    # so this codebase's uniform #include <AL/al.h> needs that parent
+    # directory added explicitly too.
+    get_filename_component(OPENAL_INCLUDE_PARENT_DIR "${OPENAL_INCLUDE_DIR}" DIRECTORY)
+    list(APPEND OPENAL_INCLUDE_DIR "${OPENAL_INCLUDE_PARENT_DIR}")
+endif()
 
 # Classic Alure 1.x has no vcpkg port or Homebrew formula, so it isn't findable
 # out of the box on MSVC/macOS (Linux apt and the bundled windows/ MinGW libs
@@ -194,9 +275,32 @@ find_package(Alure QUIET)
 if(NOT ALURE_FOUND)
     message(STATUS "System Alure not found - fetching and building alure 1.2 from source")
 
+    # alure.h guards every one of its C API declarations behind ALURE_API,
+    # which - unless ALURE_STATIC_LIBRARY is defined - expands to
+    # __declspec(dllimport) on Windows (extern elsewhere, so this never
+    # bit Linux/macOS). We only ever build/link the static alure-*.lib
+    # here (BUILD_STATIC below), never a DLL, so without this define every
+    # call site expects an import-library entry that doesn't exist -
+    # "unresolved external symbol __imp_alureCreateStreamFromFile" etc.
+    # Must apply to any of our own code that includes <AL/alure.h>
+    # (currently just device/cd.cpp), not just alure's own build.
+    add_definitions(-DALURE_STATIC_LIBRARY)
+
     include(FetchContent)
     set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    # alure 1.2's CMakeLists.txt gates its static "alure-static" target
+    # behind its own BUILD_STATIC option, which we never forced on - only
+    # BUILD_SHARED (disabled above) and BUILD_EXAMPLES. On MSVC this left
+    # neither the shared nor the static alure target defined at all: no
+    # compile activity for it anywhere in the build, and
+    # target_link_libraries(... alure-static ...) below silently fell back
+    # to treating "alure-static" as a bare (nonexistent) library name
+    # instead of a real target - no configure-time error, just a link
+    # failure later ("cannot open input file 'alure-static.lib'"). Force it
+    # on explicitly so the target this project actually links against
+    # (ALURE_LIBRARY, set to alure-static below) always gets built.
+    set(BUILD_STATIC ON CACHE BOOL "" FORCE)
 
     FetchContent_Declare(alure_src
         URL https://archive.ubuntu.com/ubuntu/pool/universe/a/alure/alure_1.2.orig.tar.bz2
@@ -222,6 +326,24 @@ if(NOT ALURE_FOUND)
         # for processing this subdirectory.
         set(_alure_saved_policy_min "${CMAKE_POLICY_VERSION_MINIMUM}")
         set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
+        # alure's own CMakeLists.txt runs its own find_package(OpenAL) to
+        # find <AL/al.h> for its own sources, using CMake's classic
+        # variable-based FindOpenAL module - that works out of the box on
+        # Linux/macOS but doesn't resolve vcpkg's OpenAL on MSVC (vcpkg
+        # exposes OpenAL via a modern CONFIG package/target, not the
+        # OPENAL_INCLUDE_DIR variable a classic MODULE-mode find_package()
+        # call expects), so alure-static's own sources fail with "Cannot
+        # open include file: 'al.h'" there. target_include_directories()
+        # can't reach across into alure's own project()/target after the
+        # fact ("Cannot specify include directories for target ... which is
+        # not built by this project"), so inject this project's own
+        # already-resolved OpenAL include dir the directory-scoped way
+        # instead, right before add_subdirectory() - it's inherited by
+        # every subdirectory added afterward regardless of which project()
+        # they declare, and is a no-op anywhere alure's own lookup already
+        # succeeds.
+        include_directories(${OPENAL_INCLUDE_DIR})
         add_subdirectory(${alure_src_SOURCE_DIR} ${alure_src_BINARY_DIR})
         set(CMAKE_POLICY_VERSION_MINIMUM "${_alure_saved_policy_min}")
     endif()
@@ -230,7 +352,33 @@ if(NOT ALURE_FOUND)
     # target (only its shared counterpart does), so consumers must do so
     # themselves - src/CMakeLists.txt already links ${OPENAL_LIBRARY}
     # alongside ${ALURE_LIBRARY} independently, so this matches.
-    set(ALURE_LIBRARY alure-static)
+    #
+    # The static library's actual CMake target name is NOT the literal
+    # "alure-static" this project assumed for a while - alure's own
+    # CMakeLists.txt embeds a 32/64-bit-dependent prefix into the target
+    # name itself (observed on this CI's MSVC/vcpkg toolchain as
+    # "ALURE32-static"), which previously caused
+    # target_link_libraries(... alure-static ...) to silently fall back to
+    # treating "alure-static" as a bare, nonexistent library name (no
+    # configure-time error) - failing only much later at the link step
+    # with "cannot open input file 'alure-static.lib'", after alure's own
+    # sources had already compiled and linked fine under their real name.
+    # Query the real name directly instead of hardcoding it, so this
+    # doesn't silently break again if a future CI image's bitness
+    # detection picks a different prefix.
+    get_property(_alure_buildsystem_targets DIRECTORY "${alure_src_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
+    set(ALURE_LIBRARY "")
+    foreach(_alure_candidate_target ${_alure_buildsystem_targets})
+        get_target_property(_alure_candidate_type ${_alure_candidate_target} TYPE)
+        if(_alure_candidate_type STREQUAL "STATIC_LIBRARY")
+            set(ALURE_LIBRARY ${_alure_candidate_target})
+        endif()
+    endforeach()
+    if(NOT ALURE_LIBRARY)
+        message(FATAL_ERROR "Could not determine alure's static library target name among: ${_alure_buildsystem_targets}")
+    endif()
+    message(STATUS "Alure static library target resolved to: ${ALURE_LIBRARY}")
+
     set(ALURE_INCLUDE_DIR ${alure_src_SOURCE_DIR}/include)
     set(ALURE_FOUND TRUE)
 endif()
@@ -245,28 +393,48 @@ if(NOT DEV_BUILD)
 endif()
 
 if(PLATFORM_WINDOWS)
-  if(NOT BUILD_32)
-    find_library(MSVCRT_LIBRARY msvcrt HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(FREETYPE_LIBRARY freetype HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(HARFBUZZ_LIBRARY harfbuzz HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(BZ2_LIBRARY bz2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(PNG16_LIBRARY png16 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(GRAPHITE2_LIBRARY graphite2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(Z_LIBRARY z HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(RPCRT4_LIBRARY rpcrt4 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    find_library(USP10_LIBRARY usp10 HINTS ${WINDOWS_DEPENDENCIES_DIR})
-    # Windows 64-bit libraries
-    set(LIBS
-        ${MSVCRT_LIBRARY}
-        ${FREETYPE_LIBRARY}
-        ${HARFBUZZ_LIBRARY}
-        ${BZ2_LIBRARY}
-        ${PNG16_LIBRARY}
-        ${GRAPHITE2_LIBRARY}
-        ${Z_LIBRARY}
-        ${RPCRT4_LIBRARY}
-        ${USP10_LIBRARY}
-    )
+  if(DEFINED WINDOWS_DEPENDENCIES_DIR)
+    # MinGW cross build (see cmake/Toolchain-mingw64.cmake): links directly against
+    # the prebuilt windows/lib64/libfreetype.a, which was statically built bundling
+    # harfbuzz/graphite2/bz2/png16/zlib - none of those are otherwise on the link
+    # line, so they have to be resolved and linked explicitly here.
+    if(NOT BUILD_32)
+      find_library(MSVCRT_LIBRARY msvcrt HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(FREETYPE_LIBRARY freetype HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(HARFBUZZ_LIBRARY harfbuzz HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(BZ2_LIBRARY bz2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(PNG16_LIBRARY png16 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(GRAPHITE2_LIBRARY graphite2 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(Z_LIBRARY z HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(RPCRT4_LIBRARY rpcrt4 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      find_library(USP10_LIBRARY usp10 HINTS ${WINDOWS_DEPENDENCIES_DIR})
+      # Windows 64-bit libraries
+      set(LIBS
+          ${MSVCRT_LIBRARY}
+          ${FREETYPE_LIBRARY}
+          ${HARFBUZZ_LIBRARY}
+          ${BZ2_LIBRARY}
+          ${PNG16_LIBRARY}
+          ${GRAPHITE2_LIBRARY}
+          ${Z_LIBRARY}
+          ${RPCRT4_LIBRARY}
+          ${USP10_LIBRARY}
+      )
+    endif()
+  else()
+    # Native MSVC build (vcpkg toolchain, no WINDOWS_DEPENDENCIES_DIR set): the
+    # find_library() calls above hunted for standalone harfbuzz/graphite2/msvcrt/
+    # rpcrt4/usp10 libs that don't exist in this toolchain (vcpkg's freetype port
+    # doesn't build/export those, and find_library() can't see the Windows SDK/CRT
+    # library dirs the MSVC linker already knows about) and hard-failed CMake
+    # configure with NOTFOUND. find_package(Freetype REQUIRED) above already
+    # resolved the real Freetype::Freetype target for this toolchain (including
+    # whatever it actually needs transitively), so just use that.
+    if(TARGET Freetype::Freetype)
+      set(FREETYPE_LIBRARY Freetype::Freetype)
+    else()
+      set(FREETYPE_LIBRARY ${FREETYPE_LIBRARIES})
+    endif()
   endif()
 endif()
 

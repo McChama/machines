@@ -52,7 +52,7 @@ class SDLApp : public AfxOSSpecificApp<SDLApp>
 public:
 	virtual ~SDLApp();
 private:
-	friend class AfxSingletonApp;
+	friend class AfxSingletonApp<SDLApp>;
 	SDLApp();
 
 	// Provide virtual fns required by base classes.

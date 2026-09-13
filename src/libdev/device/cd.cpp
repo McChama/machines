@@ -438,6 +438,8 @@ Seconds DevCD::currentTrackLengthInSeconds() const
 
     return (MCI_MSF_MINUTE(mciStatusParms.dwReturn)*60) +
     	    (MCI_MSF_SECOND(mciStatusParms.dwReturn));*/
+	ASSERT(false, "Function not implemented");
+	return 0;
 }
 
 //TBD - Unable to implement through MCI

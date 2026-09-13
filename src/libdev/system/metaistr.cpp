@@ -13,6 +13,7 @@ SysMetaFileIstream::SysMetaFileIstream(
     const SysMetaFile& metaFile,
     const SysPathName& fileName,
     std::ios::open_mode openMode )
+: std::istream( NULL )
 {
     PRE( metaFile.hasFile( fileName ) );
 }

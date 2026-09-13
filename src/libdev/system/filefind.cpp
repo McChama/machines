@@ -13,7 +13,12 @@
 
 #include "ctl/vector.hpp"
 
-#ifdef _WIN95APP
+// MSVC has no POSIX dirent.h/opendir/readdir at all (that's what the
+// _SDLAPP branch below uses) - reuse the existing native Win32
+// FindFirstFile/FindNextFile implementation (the _WIN95APP branch) instead,
+// same as the pre-SDL2 Windows build already did, rather than pulling in a
+// third-party dirent-for-Windows shim.
+#if defined(_WIN95APP) || defined(_MSC_VER)
 #include "windows.h"
 #else
     #include <dirent.h>
@@ -180,7 +185,7 @@ int	SysFileFinder::processFiles( const SysPathName& directoryName )
 
 	return(abort);
 
-#elif defined _WIN95APP
+#elif defined(_WIN95APP) || defined(_MSC_VER)
 
 	WIN32_FIND_DATA data;
 	int		err, abort;

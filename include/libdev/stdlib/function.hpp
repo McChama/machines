@@ -132,7 +132,6 @@ mem_fun_ref( RESULT (T::*m)( ARG ) )
 
 template< class T >
 class mem_fun_t_void
-: public std::unary_function< T *, void >
 {
 public:
 
@@ -163,8 +162,6 @@ mem_fun_void( void (T::*m)() )
 //template< class T, class ARG  >
 template< class T, class ARG >
 class mem_fun1_t_void
-//: public std::binary_function< T *, ARG, RESULT >
-: public std::binary_function< T *, ARG, bool >
 {
 public:
 
@@ -194,7 +191,6 @@ mem_fun_void( void (T::*m)( ARG ) )
 
 template< class T >
 class mem_fun_ref_t_void
-: public std::unary_function< T&, void >
 {
 public:
 
@@ -224,7 +220,6 @@ mem_fun_ref_void( void (T::*m)() )
 
 template< class T, class ARG >
 class mem_fun1_ref_t_void
-: public std::binary_function< T&, ARG, void >
 {
 public:
 
@@ -247,8 +242,7 @@ template < class T, class ARG >
 mem_fun1_ref_t_void< T, ARG >
 mem_fun_ref_void( void (T::*m)( ARG ) )
 {
-	//return std::mem_fun1_ref_t< T, ARG >( m );
-	return std::mem_fun1_ref_t< T, ARG, bool >( m );
+	return mem_fun1_ref_t_void< T, ARG >( m );
 }
 
 
