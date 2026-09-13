@@ -16,7 +16,7 @@
 //////////////////////////////////////////////////////////////////////
 
 _CODE_INLINE
-void * operator new( size_t, void *p )
+void * operator new( size_t, void *p ) NOEXCEPT
 {
 	return p;
 }
