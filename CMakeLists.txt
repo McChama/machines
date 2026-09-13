@@ -303,22 +303,26 @@ if(NOT ALURE_FOUND)
         # for processing this subdirectory.
         set(_alure_saved_policy_min "${CMAKE_POLICY_VERSION_MINIMUM}")
         set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-        add_subdirectory(${alure_src_SOURCE_DIR} ${alure_src_BINARY_DIR})
-        set(CMAKE_POLICY_VERSION_MINIMUM "${_alure_saved_policy_min}")
 
-        # alure-static's own CMakeLists.txt runs its own find_package(OpenAL)
-        # to find <AL/al.h> for its own sources, using CMake's classic
+        # alure's own CMakeLists.txt runs its own find_package(OpenAL) to
+        # find <AL/al.h> for its own sources, using CMake's classic
         # variable-based FindOpenAL module - that works out of the box on
         # Linux/macOS but doesn't resolve vcpkg's OpenAL on MSVC (vcpkg
         # exposes OpenAL via a modern CONFIG package/target, not the
-        # OPENAL_INCLUDE_DIR variable classic MODULE-mode find_package()
-        # calls expect), so alure-static's own sources fail with "Cannot
-        # open include file: 'al.h'" there. Pass through the OpenAL include
-        # dir this project already resolved via its own find_package(OpenAL
-        # REQUIRED) above - a no-op where alure's own lookup already
-        # succeeds, since target_include_directories just adds a duplicate
-        # (deduplicated) entry there.
-        target_include_directories(alure-static PRIVATE ${OPENAL_INCLUDE_DIR})
+        # OPENAL_INCLUDE_DIR variable a classic MODULE-mode find_package()
+        # call expects), so alure-static's own sources fail with "Cannot
+        # open include file: 'al.h'" there. target_include_directories()
+        # can't reach across into alure's own project()/target after the
+        # fact ("Cannot specify include directories for target ... which is
+        # not built by this project"), so inject this project's own
+        # already-resolved OpenAL include dir the directory-scoped way
+        # instead, right before add_subdirectory() - it's inherited by
+        # every subdirectory added afterward regardless of which project()
+        # they declare, and is a no-op anywhere alure's own lookup already
+        # succeeds.
+        include_directories(${OPENAL_INCLUDE_DIR})
+        add_subdirectory(${alure_src_SOURCE_DIR} ${alure_src_BINARY_DIR})
+        set(CMAKE_POLICY_VERSION_MINIMUM "${_alure_saved_policy_min}")
     endif()
 
     # alure-static's own CMakeLists.txt never links OpenAL into the static
